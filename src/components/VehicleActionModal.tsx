@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Vehicle, OperatorProfile, FlightData } from '../types';
-import { X, UserPlus, Trash2, Power, PowerOff, Droplet, Save } from 'lucide-react';
-import { DesigOpr } from './desigopr';
+import { X, UserPlus, Trash2, Power, PowerOff, Droplet, Save, User, Search, Check } from 'lucide-react';
 
 interface VehicleActionModalProps {
   vehicle: Vehicle | null;
@@ -165,22 +164,59 @@ export const VehicleActionModal: React.FC<VehicleActionModalProps> = ({
         </div>
       )}
 
-      <DesigOpr 
-        isOpen={isAssignModalOpen}
-        onClose={() => setIsAssignModalOpen(false)}
-        operators={operators}
-        vehicles={vehicles}
-        flights={flights}
-        vehicle={vehicle}
-        onConfirm={(operatorId) => {
-            const operator = operators.find(op => op.id === operatorId);
-            if (operator) {
-                onUpdateVehicle({ ...vehicle, operatorName: operator.warName, status: 'OCUPADO' });
-            }
-            setIsAssignModalOpen(false);
-            onClose();
-        }}
-      />
+      {isAssignModalOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] shadow-2xl backdrop-blur-sm" onClick={() => setIsAssignModalOpen(false)}>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 w-full max-w-md space-y-4 animate-in zoom-in-95 duration-100" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <UserPlus size={18} className="text-blue-400" />
+                <h3 className="text-sm font-black text-white uppercase tracking-wider font-mono">Designar Operador ({vehicle.id})</h3>
+              </div>
+              <button onClick={() => setIsAssignModalOpen(false)} className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="max-h-72 overflow-y-auto space-y-1.5 pr-1">
+              {operators.length === 0 ? (
+                <div className="text-center py-6 text-slate-500 text-xs font-mono">Nenhum operador cadastrado</div>
+              ) : (
+                operators.map((op) => (
+                  <button
+                    key={op.id}
+                    onClick={() => {
+                      onUpdateVehicle({ ...vehicle, operatorName: op.warName, status: 'OCUPADO' });
+                      setIsAssignModalOpen(false);
+                      onClose();
+                    }}
+                    className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-950/60 hover:bg-slate-800/80 border border-slate-800/60 hover:border-blue-500/40 transition-all text-left group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 font-mono font-bold text-xs">
+                        {op.warName?.substring(0, 2).toUpperCase() || 'OP'}
+                      </div>
+                      <div>
+                        <div className="text-xs font-black text-white font-mono group-hover:text-blue-400 transition-colors">{op.warName}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{op.name} • {op.role || 'Operador'}</div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold text-slate-400 group-hover:text-blue-400 flex items-center gap-1">
+                      Selecionar
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+
+            <button
+              onClick={() => setIsAssignModalOpen(false)}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 p-2.5 rounded-lg text-xs font-mono font-bold uppercase transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
