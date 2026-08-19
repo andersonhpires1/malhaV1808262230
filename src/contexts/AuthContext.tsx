@@ -178,16 +178,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   };
 
+  const findOperatorByWarName = async (name: string): Promise<any> => {
+    // 1. Tenta correspondência exata case-insensitive primeiro (super rápida e padrão)
+    const { data, error } = await supabase
+      .from('operadores_geral')
+      .select('*')
+      .ilike('war_name', name.trim())
+      .limit(1)
+      .maybeSingle();
+
+    if (data && !error) return data;
+
+    // 2. Se falhar, busca todos e filtra no cliente ignorando acentos de forma tolerante e segura
+    const { data: allOps, error: allOpsErr } = await supabase
+      .from('operadores_geral')
+      .select('*');
+    
+    if (allOps && !allOpsErr) {
+      const searchNorm = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+      const found = allOps.find(op => {
+        if (!op.war_name) return false;
+        const opNorm = op.war_name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+        return opNorm === searchNorm;
+      });
+      if (found) return found;
+    }
+    return null;
+  };
+
   const loginWithWarName = async (name: string) => {
     try {
-      const { data, error } = await supabase
-        .from('operadores_geral')
-        .select('*')
-        .ilike('war_name', name)
-        .limit(1)
-        .single();
+      const data = await findOperatorByWarName(name);
 
-      if (error || !data) {
+      if (!data) {
         return { success: false, error: 'Acesso negado. Usuário não encontrado no sistema.' };
       }
 
@@ -236,14 +259,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithPassword = async (name: string, password: string) => {
     try {
-      const { data, error } = await supabase
-        .from('operadores_geral')
-        .select('*')
-        .ilike('war_name', name)
-        .limit(1)
-        .single();
+      const data = await findOperatorByWarName(name);
 
-      if (error || !data) {
+      if (!data) {
         return { success: false, error: 'Usuário não encontrado.' };
       }
 
@@ -269,14 +287,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const completeFirstLogin = async (name: string, email: string, password: string) => {
     try {
-      const { data: operator, error: fetchError } = await supabase
-        .from('operadores_geral')
-        .select('*')
-        .ilike('war_name', name)
-        .limit(1)
-        .single();
+      const operator = await findOperatorByWarName(name);
 
-      if (fetchError || !operator) {
+      if (!operator) {
         return { success: false, error: 'Usuário não encontrado.' };
       }
 
