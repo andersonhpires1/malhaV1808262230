@@ -1491,13 +1491,12 @@ export const OperatorsAdmin: React.FC<OperatorsAdminProps> = ({ isDarkMode, glob
                           ${stickyThClass}
                         `}
                       >
-                        <div className="flex items-center justify-center gap-1.5">
-                          {col.label}
-                          {col.key !== 'actions' && (
-                            <div className="flex flex-col gap-0.5 opacity-30">
-                              <ChevronDown size={8} className={`-rotate-180 ${sortConfig.key === col.key && sortConfig.direction === 'asc' ? 'opacity-100 text-emerald-400' : ''}`} />
-                              <ChevronDown size={8} className={`${sortConfig.key === col.key && sortConfig.direction === 'desc' ? 'opacity-100 text-emerald-400' : ''}`} />
-                            </div>
+                        <div className="flex items-center justify-center gap-1">
+                          <span>{col.label}</span>
+                          {sortConfig.key === col.key && (
+                            <span className="text-[9px] text-amber-300 font-black">
+                              {sortConfig.direction === 'desc' ? '▼' : '▲'}
+                            </span>
                           )}
                         </div>
                       </th>

@@ -13,6 +13,7 @@ import { InlineCalendar } from './ui/InlineCalendar';
 import { supabase } from '../lib/supabase';
 import { getBaseMeshFlights, upsertBaseMeshFlights, clearBaseMeshFlights, getDestinos, getAircrafts } from '../services/supabaseService';
 import { formatAirlineName } from '../utils/airlineUtils';
+import { AirlineLogo } from './AirlineLogo';
 import { downloadTemplate } from '../utils/excelTemplateUtils';
 import { findMatchingAircraft } from '../utils/aircraftMatcher';
 import { getCityName } from '../utils/destinos';
@@ -160,7 +161,7 @@ const formatImportTime = (rawVal: string) => {
 };
 
 const COLUMNS: { key: MeshField; label: string; width: string; isVariable: boolean }[] = [
-  { key: 'airline', label: 'Cia', width: 'w-24', isVariable: false },
+  { key: 'airline', label: 'CIA', width: 'w-14 min-w-[50px]', isVariable: false },
   { key: 'flightNumber', label: 'V.Cheg', width: 'w-24', isVariable: true },
   { key: 'eta', label: 'ETA', width: 'w-24', isVariable: true },
   { key: 'departureFlightNumber', label: 'V.Saída', width: 'w-24', isVariable: true },
@@ -1503,13 +1504,12 @@ export const OperationalMesh: React.FC<OperationalMeshProps> = ({
                         ${col.key !== 'actions' ? 'cursor-pointer hover:bg-slate-700 transition-colors' : ''}
                       `}
                     >
-                      <div className="flex items-center justify-center gap-1.5">
-                        {col.label}
-                        {col.key !== 'actions' && (
-                          <div className="flex flex-col gap-0.5 opacity-30">
-                            <ChevronDown size={8} className={`-rotate-180 ${sortConfig.key === col.key && sortConfig.direction === 'asc' ? 'opacity-100 text-emerald-400' : ''}`} />
-                            <ChevronDown size={8} className={`${sortConfig.key === col.key && sortConfig.direction === 'desc' ? 'opacity-100 text-emerald-400' : ''}`} />
-                          </div>
+                      <div className="flex items-center justify-center gap-1">
+                        <span>{col.label}</span>
+                        {sortConfig.key === col.key && (
+                          <span className="text-[9px] text-amber-300 font-black">
+                            {sortConfig.direction === 'desc' ? '▼' : '▲'}
+                          </span>
                         )}
                       </div>
                     </th>
@@ -1724,9 +1724,8 @@ export const OperationalMesh: React.FC<OperationalMeshProps> = ({
                                 tabIndex={0}
                                 onKeyDown={(e) => handleKeyDown(e, rIdx, cIdx)}
                                 className={`
-                                  w-full h-full px-3 flex items-center gap-2 font-bold text-[11px] uppercase select-none cursor-default outline-none tracking-tight relative
+                                  w-full h-full ${col.key === 'airline' ? 'p-0' : 'px-3'} flex items-center justify-center font-bold text-[11px] uppercase select-none cursor-default outline-none tracking-tight relative
                                   ${isCellFocused ? (col.key === 'positionId' && positionRestrictions[cellValue as string] === 'CTA' ? '!text-slate-950' : '!text-white') : flight.disabled ? (isDarkMode ? 'text-slate-500/30' : 'text-slate-400/50') : (isDarkMode ? 'text-slate-200' : 'text-slate-700')}
-                                  ${col.key === 'airline' ? 'justify-start text-left' : 'justify-center text-center'}
                                   ${!col.isVariable && !isCellFocused && !isMandatoryEmpty ? (isDarkMode ? 'text-indigo-400' : 'text-indigo-700') : ''}
                                   ${col.key === 'etd' && flight[col.key] === 'PRÉ' && !isCellFocused ? (isDarkMode ? 'text-blue-400 font-black' : 'text-blue-600 font-black text-[12px]') : ''}
                                   ${col.key === 'etd' && flight[col.key] && flight[col.key] !== '?' && flight[col.key] !== 'PRÉ' && getMinutesDiff(flight[col.key] as string, flight.date || currentMeshDate) < 0 && !isCellFocused ? (isDarkMode ? 'text-red-300 bg-red-900/60 font-black' : 'text-red-800 bg-red-200 font-black tracking-widest') : ''}
@@ -1734,7 +1733,17 @@ export const OperationalMesh: React.FC<OperationalMeshProps> = ({
                                   ${col.key === 'positionId' && positionRestrictions[cellValue as string] === 'CTA' && !isCellFocused ? 'text-slate-950 font-black' : ''}
                                 `}
                               >
-                                <span>{isMandatoryEmpty ? '?' : (col.key === 'airline' ? formatAirlineName(String(cellValue)) : String(cellValue) || '-')}</span>
+                                {isMandatoryEmpty ? (
+                                  <span>?</span>
+                                ) : col.key === 'airline' ? (
+                                  <AirlineLogo 
+                                    airlineCode={String(cellValue || flight.airline || (flight as any).airline_code || '')} 
+                                    size="cell" 
+                                    showName={false} 
+                                  />
+                                ) : (
+                                  <span>{String(cellValue) || '-'}</span>
+                                )}
                                 {isMandatoryEmpty && flight.id === focusedCell?.rowId && (
                                     <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_5px_rgba(239,68,68,0.8)]" />
                                 )}

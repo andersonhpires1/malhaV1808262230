@@ -551,11 +551,11 @@ export const FleetsAdmin: React.FC<FleetsAdminProps> = ({ isDarkMode, globalVehi
                     onClick={() => handleSort(col.key)}
                     className={`h-9 px-3 text-left border-b border-r last:border-r-0 ${isDarkMode ? 'border-slate-800 text-slate-400 hover:bg-slate-800' : 'border-slate-200 text-slate-500 hover:bg-slate-200'} text-[9px] font-black uppercase tracking-widest cursor-pointer transition-colors relative group`}
                   >
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1">
                       <span>{col.label}</span>
                       {sortConfig.key === col.key && (
-                        <span className={`text-[8px] ${sortConfig.direction === 'asc' ? 'text-emerald-500' : 'text-red-500'}`}>
-                          {sortConfig.direction === 'asc' ? '▲' : '▼'}
+                        <span className="text-[9px] text-amber-300 font-black">
+                          {sortConfig.direction === 'desc' ? '▼' : '▲'}
                         </span>
                       )}
                     </div>

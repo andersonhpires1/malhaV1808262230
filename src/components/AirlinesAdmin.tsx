@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Trash2, Database, RefreshCw, Upload, Info, Image as ImageIcon, FileSpreadsheet, Download, Search, Settings, ChevronDown, X } from 'lucide-react';
+import { Plus, Trash2, Database, RefreshCw, Upload, Info, Image as ImageIcon, FileSpreadsheet, Download, Search, Settings, ChevronDown, X, Plane, Edit3 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
-import { AirlineLogo } from './AirlineLogo';
+import { AirlineLogo, getNormalizedAirlineInfo } from './AirlineLogo';
 import { AirlineType } from '../types';
 import { downloadTemplate } from '../utils/excelTemplateUtils';
+import { AirlineFleetDetail } from './AirlineFleetDetail';
 
 interface AirlinesAdminProps {
   isDarkMode: boolean;
@@ -15,18 +16,19 @@ type AirlineField = 'logo_url' | 'legal_name' | 'airline' | 'airline_code' | 'co
 
 const COLUMNS: { key: AirlineField; label: string; width: string; isVariable: boolean }[] = [
   { key: 'logo_url', label: 'Logo', width: 'w-16', isVariable: true },
-  { key: 'legal_name', label: 'Razão social', width: 'w-auto min-w-[200px]', isVariable: true },
+  { key: 'legal_name', label: 'Razão social', width: 'w-auto min-w-[220px]', isVariable: true },
   { key: 'airline', label: 'Comp.', width: 'w-32', isVariable: true },
   { key: 'airline_code', label: 'Cód. da Comp', width: 'w-32', isVariable: true },
-  { key: 'country', label: 'País/Região', width: 'w-32', isVariable: true },
-  { key: 'equipment_count', label: 'Qnt Aeron.', width: 'w-24', isVariable: false },
-  { key: 'flight_count', label: 'Qnt. Voos', width: 'w-24', isVariable: false },
-  { key: 'is_active', label: 'Ativo', width: 'w-24', isVariable: true },
-  { key: 'actions', label: 'Ações', width: 'w-20', isVariable: false },
+  { key: 'country', label: 'País/Região', width: 'w-36', isVariable: true },
+  { key: 'equipment_count', label: 'Equip.', width: 'w-24', isVariable: false },
+  { key: 'flight_count', label: 'Voos', width: 'w-24', isVariable: false },
+  { key: 'is_active', label: 'Ativo', width: 'w-20', isVariable: true },
+  { key: 'actions', label: 'Ações', width: 'w-32', isVariable: false },
 ];
 
 export const AirlinesAdmin: React.FC<AirlinesAdminProps> = ({ isDarkMode }) => {
   const [airlines, setAirlines] = useState<(AirlineType & { equipment_count?: number; flight_count?: number })[]>([]);
+  const [selectedAirlineForFleet, setSelectedAirlineForFleet] = useState<(AirlineType & { equipment_count?: number; flight_count?: number }) | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'GERAL' | 'NACIONAL' | 'INTERNACIONAL' | 'EXECUTIVA'>('GERAL');
   
@@ -139,18 +141,32 @@ export const AirlinesAdmin: React.FC<AirlinesAdminProps> = ({ isDarkMode }) => {
     return result;
   }, [airlines, activeTab, aircraftSearch, matchingAirlineCodesFromAircraft]);
 
-  const sortedLogos = useMemo(() => {
-    return [...filteredAirlines].sort((a, b) => {
-      const flightA = a.flight_count || 0;
-      const flightB = b.flight_count || 0;
-      if (flightB !== flightA) {
-        return flightB - flightA; // Descending by flight count (Primary)
+  const [sortField, setSortField] = useState<AirlineField>('flight_count');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  const displayedAirlines = useMemo(() => {
+    const list = [...filteredAirlines];
+    list.sort((a, b) => {
+      let valA: any = a[sortField as keyof typeof a];
+      let valB: any = b[sortField as keyof typeof b];
+
+      if (sortField === 'equipment_count' || sortField === 'flight_count') {
+        valA = Number(valA) || 0;
+        valB = Number(valB) || 0;
+        return sortOrder === 'desc' ? valB - valA : valA - valB;
       }
-      const equipA = a.equipment_count || 0;
-      const equipB = b.equipment_count || 0;
-      return equipB - equipA; // Descending by equipment/aircraft count (Secondary)
+
+      valA = String(valA || '').toUpperCase();
+      valB = String(valB || '').toUpperCase();
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
     });
-  }, [filteredAirlines]);
+    return list;
+  }, [filteredAirlines, sortField, sortOrder]);
+
+  const activeCount = useMemo(() => filteredAirlines.filter(a => a.is_active).length, [filteredAirlines]);
+  const inactiveCount = useMemo(() => filteredAirlines.filter(a => !a.is_active).length, [filteredAirlines]);
   
   const [showImportInstructions, setShowImportInstructions] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -164,11 +180,8 @@ export const AirlinesAdmin: React.FC<AirlinesAdminProps> = ({ isDarkMode }) => {
 
   const getLogoUrl = (code: string) => {
     if (!code) return '';
-    const upper = code.toUpperCase();
-    if (upper === 'G3' || upper === 'RG') {
-        return 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Gol_Linhas_A%C3%A9reas_logo.svg/320px-Gol_Linhas_A%C3%A9reas_logo.svg.png';
-    }
-    return `https://images.kiwi.com/airlines/64/${upper}.png`;
+    const info = getNormalizedAirlineInfo(code);
+    return info.logoUrl || `https://images.kiwi.com/airlines/64/${info.iata || code.toUpperCase()}.png`;
   };
 
   const [focusedCell, setFocusedCell] = useState<{ rowId: string; col: number } | null>(null);
@@ -184,25 +197,76 @@ export const AirlinesAdmin: React.FC<AirlinesAdminProps> = ({ isDarkMode }) => {
             return;
         }
 
-        // Fetch counts from aeronaves
-        const { data: aeronaves } = await supabase.from('aeronaves').select('airline');
+        // Busca simultânea das contagens de aeronaves (frotas), malha base (contratos de SBGR) e malha operacional
+        const [aeroRes, baseMeshRes, opMeshRes] = await Promise.all([
+            supabase.from('aeronaves').select('airline'),
+            supabase.from('malha_dia').select('airline, airline_code, flight_number, departure_flight_number, is_disabled, desabilitado'),
+            supabase.from('malha_operacional').select('airline, airline_code, flight_number, departure_flight_number')
+        ]);
 
+        // 1. Contagem de Equipamentos (Aeronaves cadastradas por frota)
         const equipCounts: Record<string, number> = {};
-        const flightCounts: Record<string, number> = {};
-
-        if (aeronaves) {
-            aeronaves.forEach(a => {
+        if (aeroRes.data) {
+            aeroRes.data.forEach((a: any) => {
                 if (a.airline) {
-                    equipCounts[a.airline] = (equipCounts[a.airline] || 0) + 1;
+                    const key = String(a.airline).trim().toUpperCase();
+                    equipCounts[key] = (equipCounts[key] || 0) + 1;
                 }
             });
         }
 
-        const enrichedAirlines = (airlinesData as AirlineType[]).map(a => ({
-            ...a,
-            equipment_count: equipCounts[a.airline_code] || equipCounts[a.airline] || 0, // Fallback check
-            flight_count: 0
-        }));
+        // 2. Contagem Fiel e Complexa de Voos (Prioriza Malha Base / Contratos Ativos de SBGR)
+        const activeBaseFlights = (baseMeshRes.data || []).filter((f: any) => !f.is_disabled && !f.desabilitado);
+        const sourceFlights = activeBaseFlights.length > 0 ? activeBaseFlights : (opMeshRes.data || []);
+
+        const flightCountsByCode: Record<string, number> = {};
+        const flightCountsByName: Record<string, number> = {};
+        const flightCountsByCallsign: Record<string, number> = {};
+
+        sourceFlights.forEach((f: any) => {
+            const codeKey = f.airline_code ? String(f.airline_code).trim().toUpperCase() : '';
+            const nameKey = f.airline ? String(f.airline).trim().toUpperCase() : '';
+            const fNum = String(f.flight_number || f.departure_flight_number || '').trim().toUpperCase();
+
+            if (codeKey) {
+                flightCountsByCode[codeKey] = (flightCountsByCode[codeKey] || 0) + 1;
+            }
+            if (nameKey) {
+                flightCountsByName[nameKey] = (flightCountsByName[nameKey] || 0) + 1;
+            }
+
+            // Extração do código IATA pelo prefixo do número do voo (ex: G3 1579 -> G3, LA 3012 -> LA, TP 088 -> TP, AD 4120 -> AD, AF 454 -> AF)
+            const prefixMatch = fNum.match(/^([A-Z0-9]{2,3})/);
+            if (prefixMatch && prefixMatch[1]) {
+                const prefixKey = prefixMatch[1];
+                flightCountsByCallsign[prefixKey] = (flightCountsByCallsign[prefixKey] || 0) + 1;
+            }
+        });
+
+        const enrichedAirlines = (airlinesData as AirlineType[]).map(a => {
+            const codeUpper = String(a.airline_code || '').trim().toUpperCase();
+            const nameUpper = String(a.airline || '').trim().toUpperCase();
+            const legalUpper = String(a.legal_name || '').trim().toUpperCase();
+
+            // Match flexível para frotas de aeronaves
+            const eqCount = equipCounts[codeUpper] || equipCounts[nameUpper] || equipCounts[legalUpper] || 0;
+            
+            // Match fiel para contagem de voos da malha
+            let flCount = 0;
+            if (codeUpper && flightCountsByCode[codeUpper] !== undefined) {
+                flCount = flightCountsByCode[codeUpper];
+            } else if (nameUpper && flightCountsByName[nameUpper] !== undefined) {
+                flCount = flightCountsByName[nameUpper];
+            } else if (codeUpper && flightCountsByCallsign[codeUpper] !== undefined) {
+                flCount = flightCountsByCallsign[codeUpper];
+            }
+
+            return {
+                ...a,
+                equipment_count: eqCount,
+                flight_count: flCount
+            };
+        });
 
         setAirlines(enrichedAirlines);
     } catch (e) {
@@ -500,6 +564,23 @@ export const AirlinesAdmin: React.FC<AirlinesAdminProps> = ({ isDarkMode }) => {
           break;
       }
   };
+
+  if (selectedAirlineForFleet) {
+    return (
+      <AirlineFleetDetail
+        airline={selectedAirlineForFleet}
+        isDarkMode={isDarkMode}
+        onBack={() => {
+          setSelectedAirlineForFleet(null);
+          fetchAirlines();
+        }}
+        onAirlineUpdated={(updated) => {
+          setSelectedAirlineForFleet(updated);
+          setAirlines(prev => prev.map(a => a.id === updated.id ? updated : a));
+        }}
+      />
+    );
+  }
   
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden relative">
@@ -512,6 +593,25 @@ export const AirlinesAdmin: React.FC<AirlinesAdminProps> = ({ isDarkMode }) => {
                     {isLoading && <RefreshCw size={12} className="animate-spin ml-2 text-slate-500" />}
                </div>
                <span className={`text-[10px] font-medium tracking-wide leading-none mt-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Gerencie o banco de dados de companhias aéreas</span>
+           </div>
+
+           {/* CONTADORES ATIVOS E INATIVOS */}
+           <div className="flex items-center gap-2.5">
+             <div className={`flex items-center gap-2 px-3 py-1 rounded-lg border text-xs font-black uppercase tracking-wider shadow-xs ${
+               isDarkMode ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-400' : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+             }`}>
+               <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.9)]" />
+               <span className="text-[10px] text-slate-400 font-bold">Ativos:</span>
+               <span className="font-mono text-xs font-black">{activeCount}</span>
+             </div>
+
+             <div className={`flex items-center gap-2 px-3 py-1 rounded-lg border text-xs font-black uppercase tracking-wider shadow-xs ${
+               isDarkMode ? 'bg-red-950/40 border-red-800/50 text-red-400 shadow-[0_0_8px_rgba(239,68,68,0.15)]' : 'bg-red-50 border-red-200 text-red-700'
+             }`}>
+               <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.9)]" />
+               <span className="text-[10px] text-slate-400 font-bold">Inativos:</span>
+               <span className="font-mono text-xs font-black">{inactiveCount}</span>
+             </div>
            </div>
            
            <div className="flex items-center gap-3">
@@ -684,29 +784,76 @@ export const AirlinesAdmin: React.FC<AirlinesAdminProps> = ({ isDarkMode }) => {
             </div>
         )}
 
-        {/* GRID VIEW */}
-        <div className={`w-full flex-1 overflow-auto relative flex justify-start custom-scrollbar items-start ${isDarkMode ? 'bg-slate-950' : 'bg-slate-100'}`}>
-            <div className={`w-[65%] border-r border-b text-left ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-300'}`}>
+        {/* GRID VIEW - FULL WIDTH */}
+        <div className={`w-full flex-1 overflow-auto relative flex flex-col justify-start custom-scrollbar items-start ${isDarkMode ? 'bg-slate-950' : 'bg-slate-100'}`}>
+            <div className={`w-full border-b text-left ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-300'}`}>
                 <table ref={tableRef} className="w-full text-left border-separate border-spacing-0">
                     <thead className={`sticky top-0 z-10 ${isDarkMode ? 'bg-slate-950 border-slate-700' : 'bg-[#2D8E48] text-white shadow-sm'}`}>
                         <tr>
-                            {COLUMNS.map((col, idx) => (
-                                <th key={idx} className={`px-2 py-3 text-[10px] font-black uppercase tracking-widest border-b border-r last:border-r-0 ${isDarkMode ? 'border-slate-800' : 'border-[#29824a]'} text-center ${col.width}`}>
-                                    {col.label}
-                                </th>
-                            ))}
+                            {COLUMNS.map((col, idx) => {
+                                const isSortable = col.key !== 'actions';
+                                return (
+                                    <th 
+                                        key={idx} 
+                                        onClick={() => {
+                                            if (!isSortable) return;
+                                            if (sortField === col.key) {
+                                                setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                                            } else {
+                                                setSortField(col.key);
+                                                setSortOrder(col.key === 'equipment_count' || col.key === 'flight_count' ? 'desc' : 'asc');
+                                            }
+                                        }}
+                                        className={`px-2 py-3 text-[10px] font-black uppercase tracking-widest border-b border-r last:border-r-0 ${isDarkMode ? 'border-slate-800' : 'border-[#29824a]'} text-center ${col.width} ${isSortable ? 'cursor-pointer select-none hover:bg-black/10 transition-colors' : ''}`}
+                                        title={isSortable ? `Clique para ordenar por ${col.label}` : undefined}
+                                    >
+                                        <div className="flex items-center justify-center gap-1">
+                                            <span>{col.label}</span>
+                                            {sortField === col.key && (
+                                                <span className="text-[9px] text-amber-300 font-black">
+                                                    {sortOrder === 'desc' ? '▼' : '▲'}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </th>
+                                );
+                            })}
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredAirlines.length === 0 ? (
+                        {displayedAirlines.length === 0 ? (
                             <tr>
                                 <td colSpan={COLUMNS.length} className={`px-4 py-8 text-center text-[10px] border-b uppercase tracking-widest font-black ${isDarkMode ? 'bg-slate-900 text-slate-500' : 'bg-white text-slate-400'}`}>
                                     Nenhuma companhia cadastrada nesta aba
                                 </td>
                             </tr>
                         ) : (
-                            filteredAirlines.map((airline, rowIndex) => (
-                                <tr key={airline.id} data-row={rowIndex} className={`group transition-colors h-10 border-b ${isDarkMode ? 'hover:bg-slate-800/50 border-slate-800/50' : 'hover:bg-slate-50 border-slate-200'}`}>
+                            displayedAirlines.map((airline, rowIndex) => {
+                                const isInactive = !airline.is_active;
+                                const cellBaseClass = isInactive
+                                    ? isDarkMode
+                                        ? 'border-red-900/30 bg-red-950/20 text-red-300'
+                                        : 'border-red-200/80 bg-red-50/50 text-red-900'
+                                    : isDarkMode
+                                    ? 'border-slate-700/50 bg-slate-800/20 text-slate-300'
+                                    : 'border-slate-200 bg-white group-hover:bg-slate-50 text-slate-700';
+
+                                return (
+                                <tr 
+                                  key={airline.id} 
+                                  data-row={rowIndex} 
+                                  onDoubleClick={() => setSelectedAirlineForFleet(airline)}
+                                  className={`group transition-colors h-10 border-b cursor-pointer ${
+                                    isInactive
+                                      ? isDarkMode 
+                                        ? 'bg-red-950/20 hover:bg-red-950/35 border-red-900/40' 
+                                        : 'bg-red-50/60 hover:bg-red-100/70 border-red-200'
+                                      : isDarkMode 
+                                      ? 'hover:bg-slate-800/50 border-slate-800/50' 
+                                      : 'hover:bg-slate-50 border-slate-200'
+                                  }`}
+                                  title="Duplo clique para abrir a frota e detalhes desta companhia"
+                                >
                                     {COLUMNS.map((col, colIndex) => {
                                         const isFocused = focusedCell?.rowId === airline.id && focusedCell?.col === colIndex;
                                         const focusClasses = isFocused ? 'ring-2 ring-emerald-500 ring-inset z-10 shadow-[inset_0_0_0_2px_rgba(16,185,129,0.5)]' : '';
@@ -716,7 +863,7 @@ export const AirlinesAdmin: React.FC<AirlinesAdminProps> = ({ isDarkMode }) => {
                                                 <td 
                                                     key={`${airline.id}-logo`} 
                                                     onClick={() => handlePhotoClick(airline.id)}
-                                                    className={`px-2 border-y border-l cursor-pointer ${isDarkMode ? 'border-slate-700/50 bg-slate-800/20' : 'border-slate-200 bg-white group-hover:bg-slate-50'} text-center align-middle ${focusClasses}`}
+                                                    className={`px-2 border-y border-l cursor-pointer ${cellBaseClass} text-center align-middle ${focusClasses}`}
                                                 >
                                                     <div className="w-8 h-8 rounded bg-white overflow-hidden mx-auto flex items-center justify-center p-0.5 shadow-sm border border-slate-200 group/logo relative">
                                                         {airline.logo_url ? (
@@ -752,14 +899,98 @@ export const AirlinesAdmin: React.FC<AirlinesAdminProps> = ({ isDarkMode }) => {
                                                   key={`${airline.id}-actions`} 
                                                   data-col={colIndex}
                                                   tabIndex={0}
-                                                  onClick={() => setFocusedCell({ rowId: airline.id, col: colIndex })}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setFocusedCell({ rowId: airline.id, col: colIndex });
+                                                  }}
                                                   onKeyDown={(e) => handleKeyDown(e, rowIndex, colIndex)}
-                                                  className={`px-2 border-y border-l ${isDarkMode ? 'border-slate-700/50 bg-slate-800/20' : 'border-slate-200 bg-white group-hover:bg-slate-50'} text-center actions-container align-middle outline-none ${focusClasses}`}
+                                                  className={`px-2 border-y border-l ${cellBaseClass} text-center actions-container align-middle outline-none ${focusClasses}`}
                                                 >
-                                                    <div className="flex justify-center">
-                                                        <button onClick={() => setConfirmDeleteAirline(airline.id)} className={`w-7 h-7 rounded flex items-center justify-center transition-colors ${isDarkMode ? 'hover:bg-red-500/20 text-slate-400 hover:text-red-400' : 'hover:bg-red-500/10 text-slate-400 hover:text-red-500'}`}>
-                                                            <Trash2 size={14} />
+                                                    <div className="flex items-center justify-center gap-1.5">
+                                                        <button 
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedAirlineForFleet(airline);
+                                                          }}
+                                                          className="flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider bg-[#FEDC00] hover:bg-[#e5c600] text-slate-900 border border-[#FEDC00] shadow-xs transition-all active:scale-95 cursor-pointer"
+                                                          title={`Editar e gerenciar frota de ${airline.airline || airline.legal_name}`}
+                                                        >
+                                                            <Edit3 size={12} className="stroke-[2.5]" />
+                                                            <span>Editar</span>
                                                         </button>
+                                                        <button 
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setConfirmDeleteAirline(airline.id);
+                                                          }} 
+                                                          className={`w-6 h-6 rounded flex items-center justify-center transition-colors cursor-pointer ${
+                                                            isDarkMode ? 'hover:bg-red-500/20 text-slate-400 hover:text-red-400' : 'hover:bg-red-500/10 text-slate-400 hover:text-red-500'
+                                                          }`}
+                                                          title="Excluir companhia"
+                                                        >
+                                                            <Trash2 size={13} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            );
+                                        }
+
+                                        if (col.key === 'equipment_count') {
+                                            const eqVal = Number(airline.equipment_count) || 0;
+                                            return (
+                                                <td
+                                                    key={`${airline.id}-equip`}
+                                                    data-col={colIndex}
+                                                    tabIndex={0}
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      setSelectedAirlineForFleet(airline);
+                                                    }}
+                                                    onKeyDown={(e) => handleKeyDown(e, rowIndex, colIndex)}
+                                                    className={`px-2 border-y border-l ${cellBaseClass} text-center align-middle transition-colors outline-none cursor-pointer ${focusClasses}`}
+                                                    title={`Clique para abrir a frota de ${airline.airline || airline.legal_name} (${eqVal} aeronaves)`}
+                                                >
+                                                    <div className="flex items-center justify-center min-h-[24px]">
+                                                        {eqVal > 0 ? (
+                                                            <span className={`font-mono text-[11px] font-black px-2.5 py-0.5 rounded-full hover:scale-105 transition-transform ${
+                                                              isInactive
+                                                                ? isDarkMode ? 'bg-red-900/30 text-red-300 border border-red-700/40' : 'bg-red-100 text-red-800 border border-red-200'
+                                                                : isDarkMode ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                            }`}>
+                                                                {eqVal}
+                                                            </span>
+                                                        ) : (
+                                                            <span className={`font-mono text-[11px] font-bold ${isInactive ? 'text-red-400/50' : 'text-slate-400/50'} hover:text-emerald-500 transition-colors`}>+ 0</span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            );
+                                        }
+
+                                        if (col.key === 'flight_count') {
+                                            const flVal = Number(airline.flight_count) || 0;
+                                            return (
+                                                <td
+                                                    key={`${airline.id}-flights`}
+                                                    data-col={colIndex}
+                                                    tabIndex={0}
+                                                    onClick={() => setFocusedCell({ rowId: airline.id, col: colIndex })}
+                                                    onKeyDown={(e) => handleKeyDown(e, rowIndex, colIndex)}
+                                                    className={`px-2 border-y border-l ${cellBaseClass} text-center align-middle transition-colors outline-none ${focusClasses}`}
+                                                    title={`${flVal} voos ativos na programação da Malha Base de Guarulhos`}
+                                                >
+                                                    <div className="flex items-center justify-center min-h-[24px]">
+                                                        {flVal > 0 ? (
+                                                            <span className={`font-mono text-[11px] font-black px-2 py-0.5 rounded-full ${
+                                                              isInactive
+                                                                ? isDarkMode ? 'bg-red-900/30 text-red-300 border border-red-700/40' : 'bg-red-100 text-red-800 border border-red-200'
+                                                                : isDarkMode ? 'bg-blue-950/60 text-blue-400 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-200'
+                                                            }`}>
+                                                                {flVal}
+                                                            </span>
+                                                        ) : (
+                                                            <span className={`font-mono text-[11px] font-bold ${isInactive ? 'text-red-400/50' : 'text-slate-400/50'}`}>--</span>
+                                                        )}
                                                     </div>
                                                 </td>
                                             );
@@ -777,14 +1008,16 @@ export const AirlinesAdmin: React.FC<AirlinesAdminProps> = ({ isDarkMode }) => {
                                                   tabIndex={0}
                                                   onClick={() => setFocusedCell({ rowId: airline.id, col: colIndex })}
                                                   onKeyDown={(e) => handleKeyDown(e, rowIndex, colIndex)}
-                                                  className={`px-2 border-y border-l ${isDarkMode ? 'border-slate-700/50 bg-slate-800/20' : 'border-slate-200 bg-white group-hover:bg-slate-50'} text-center align-middle outline-none ${focusClasses}`}
+                                                  className={`px-2 border-y border-l ${cellBaseClass} text-center align-middle outline-none ${focusClasses}`}
                                                 >
                                                     <div className="flex items-center justify-center">
                                                         <input 
                                                             type="checkbox"
                                                             checked={!!value}
                                                             onChange={(e) => handleUpdateField(airline.id, col.key as keyof AirlineType, e.target.checked)}
-                                                            className={`w-4 h-4 rounded cursor-pointer ${isDarkMode ? 'accent-emerald-500 bg-slate-900 border-slate-700' : 'accent-[#329858] bg-white border-slate-300'}`}
+                                                            className={`w-4 h-4 rounded cursor-pointer ${
+                                                              isDarkMode ? 'accent-emerald-500 bg-slate-900 border-slate-700' : 'accent-[#329858] bg-white border-slate-300'
+                                                            }`}
                                                         />
                                                     </div>
                                                 </td>
@@ -797,7 +1030,7 @@ export const AirlinesAdmin: React.FC<AirlinesAdminProps> = ({ isDarkMode }) => {
                                                 data-col={colIndex}
                                                 tabIndex={0}
                                                 onKeyDown={(e) => handleKeyDown(e, rowIndex, colIndex)}
-                                                className={`px-2 border-y border-l ${isDarkMode ? 'border-slate-700/50 bg-slate-800/20 text-slate-300' : 'border-slate-200 bg-white group-hover:bg-slate-50 text-slate-700'} ${col.key === 'legal_name' ? 'text-left px-3' : 'text-center'} relative ${col.isVariable ? 'cursor-text' : 'opacity-70'} align-middle transition-colors outline-none ${focusClasses}`}
+                                                className={`px-2 border-y border-l ${cellBaseClass} ${col.key === 'legal_name' ? 'text-left px-3' : 'text-center'} relative ${col.isVariable ? 'cursor-text' : 'opacity-70'} align-middle transition-colors outline-none ${focusClasses}`}
                                                 onClick={(e) => {
                                                   setFocusedCell({ rowId: airline.id, col: colIndex });
                                                   if (col.isVariable) {
@@ -831,56 +1064,11 @@ export const AirlinesAdmin: React.FC<AirlinesAdminProps> = ({ isDarkMode }) => {
                                         );
                                     })}
                                 </tr>
-                            ))
+                            );
+                            })
                         )}
                     </tbody>
                 </table>
-            </div>
-
-            {/* LOGOS DIV */}
-            <div className="w-[35%] p-1 flex flex-col items-center justify-start min-h-[500px] gap-1">
-                 <div className={`flex flex-col items-start justify-center p-3 w-full rounded-[3px] shadow-sm border shrink-0 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-                     <h3 className={`text-base font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Galeria de Logos</h3>
-                     <p className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{filteredAirlines.length} empresas listadas nesta aba</p>
-                 </div>
-                 <div className={`flex flex-wrap gap-3 justify-start content-start overflow-auto p-3 w-full flex-1 border-0 rounded-[3px] ${isDarkMode ? 'bg-slate-900' : 'bg-white'}`}>
-                     {sortedLogos.map(airline => (
-                         <div 
-                             key={airline.id} 
-                             className="cursor-pointer flex-shrink-0 hover:scale-110 hover:-translate-y-1 transition-all duration-200 flex flex-col items-center justify-center relative"
-                             title={`${airline.legal_name || airline.airline} - ${airline.equipment_count || 0} Eqps / ${airline.flight_count || 0} Voos`}
-                             onClick={() => {
-                                 setFocusedCell({ rowId: airline.id, col: 0 });
-                                 // scroll table to row
-                                 const rowIndex = filteredAirlines.findIndex(a => a.id === airline.id);
-                                 if (rowIndex >= 0 && tableRef.current) {
-                                     const rowHtml = tableRef.current.querySelector(`tr[data-row="${rowIndex}"]`);
-                                     rowHtml?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                 }
-                             }}
-                         >
-                             <div className="w-[50px] h-[50px] rounded overflow-hidden shadow-sm ring-1 ring-black/5 flex items-center justify-center bg-white relative">
-                                 {airline.logo_url ? (
-                                    <img src={airline.logo_url} className="w-full h-full object-contain" />
-                                 ) : airline.airline_code ? (
-                                    <>
-                                      <img src={getLogoUrl(airline.airline_code)} className="w-full h-full object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
-                                      <div className="hidden w-full h-full flex items-center justify-center">
-                                         <ImageIcon size={20} className="text-slate-300" />
-                                      </div>
-                                    </>
-                                 ) : (
-                                    <ImageIcon size={20} className="text-slate-300" />
-                                 )}
-                             </div>
-                             {(airline.equipment_count || 0) > 0 && (
-                                 <div className="absolute -top-1.5 -right-1.5 flex items-center justify-center bg-white dark:bg-slate-800 text-[#2D8E48] dark:text-green-500 text-[8px] font-black rounded-full min-w-[16px] h-[16px] px-1 text-center shadow-sm border border-slate-300 dark:border-slate-600">
-                                     {airline.equipment_count}
-                                 </div>
-                             )}
-                         </div>
-                     ))}
-                 </div>
             </div>
         </div>
 

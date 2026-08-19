@@ -337,8 +337,32 @@ export const AircraftsAdmin: React.FC<AircraftsAdminProps> = ({ isDarkMode }) =>
     return result;
   }, [currentAirlineAircrafts, searchTerm]);
 
+  const [sortField, setSortField] = useState<AircraftField>('prefix');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  const displayedAircrafts = useMemo(() => {
+    const list = [...filteredAircrafts];
+    list.sort((a, b) => {
+      let valA: any = a[sortField as keyof typeof a];
+      let valB: any = b[sortField as keyof typeof b];
+
+      if (typeof valA === 'boolean') {
+        valA = valA ? 1 : 0;
+        valB = valB ? 1 : 0;
+        return sortOrder === 'desc' ? valB - valA : valA - valB;
+      }
+
+      valA = String(valA || '').toUpperCase();
+      valB = String(valB || '').toUpperCase();
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return list;
+  }, [filteredAircrafts, sortField, sortOrder]);
+
   const handleKeyDown = (e: React.KeyboardEvent, rowIndex: number, colIndex: number) => {
-    const aircraft = filteredAircrafts[rowIndex];
+    const aircraft = displayedAircrafts[rowIndex];
     if (!aircraft) return;
     
     const isEditing = editingCell?.rowId === aircraft.id && editingCell?.col === colIndex;
@@ -347,15 +371,15 @@ export const AircraftsAdmin: React.FC<AircraftsAdminProps> = ({ isDarkMode }) =>
         case 'ArrowDown':
             if (isEditing) return;
             e.preventDefault();
-            if (rowIndex < filteredAircrafts.length - 1) {
-                setFocusedCell({ rowId: filteredAircrafts[rowIndex + 1].id, col: colIndex });
+            if (rowIndex < displayedAircrafts.length - 1) {
+                setFocusedCell({ rowId: displayedAircrafts[rowIndex + 1].id, col: colIndex });
             }
             break;
         case 'ArrowUp':
             if (isEditing) return;
             e.preventDefault();
             if (rowIndex > 0) {
-                setFocusedCell({ rowId: filteredAircrafts[rowIndex - 1].id, col: colIndex });
+                setFocusedCell({ rowId: displayedAircrafts[rowIndex - 1].id, col: colIndex });
             }
             break;
         case 'ArrowRight':
@@ -829,26 +853,44 @@ export const AircraftsAdmin: React.FC<AircraftsAdminProps> = ({ isDarkMode }) =>
                     <thead className={`sticky top-0 z-10 ${isDarkMode ? 'bg-slate-950 border-slate-700' : 'bg-[#2D8E48] text-white shadow-sm'}`}>
                         <tr>
                             {COLUMNS.map((col, idx) => {
-                                if (col.key === 'airline' && col.label === 'Logo') {
-                                    return <th key={idx} className={`px-2 py-3 text-[10px] font-black uppercase tracking-widest border-b border-r ${isDarkMode ? 'border-slate-800' : 'border-[#29824a]'} text-center ${col.width}`}>{col.label}</th>
-                                }
+                                const isSortable = col.key !== 'actions';
                                 return (
-                                    <th key={idx} className={`px-2 py-3 text-[10px] font-black uppercase tracking-widest border-b border-r ${isDarkMode ? 'border-slate-800' : 'border-[#29824a]'} text-center ${col.width}`}>
-                                        {col.label}
+                                    <th 
+                                        key={idx} 
+                                        onClick={() => {
+                                            if (!isSortable) return;
+                                            if (sortField === col.key) {
+                                                setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                                            } else {
+                                                setSortField(col.key);
+                                                setSortOrder('asc');
+                                            }
+                                        }}
+                                        className={`px-2 py-3 text-[10px] font-black uppercase tracking-widest border-b border-r last:border-r-0 ${isDarkMode ? 'border-slate-800' : 'border-[#29824a]'} text-center ${col.width} ${isSortable ? 'cursor-pointer select-none hover:bg-black/10 transition-colors' : ''}`}
+                                        title={isSortable ? `Clique para ordenar por ${col.label}` : undefined}
+                                    >
+                                        <div className="flex items-center justify-center gap-1">
+                                            <span>{col.label}</span>
+                                            {sortField === col.key && (
+                                                <span className="text-[9px] text-amber-300 font-black">
+                                                    {sortOrder === 'desc' ? '▼' : '▲'}
+                                                </span>
+                                            )}
+                                        </div>
                                     </th>
-                                )
+                                );
                             })}
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredAircrafts.length === 0 ? (
+                        {displayedAircrafts.length === 0 ? (
                             <tr>
                                 <td colSpan={COLUMNS.length} className={`px-4 py-8 text-center text-[10px] uppercase tracking-widest font-black ${isDarkMode ? 'bg-slate-900 text-slate-500' : 'bg-white text-slate-400'}`}>
                                     Nenhuma aeronave cadastrada para esta companhia
                                 </td>
                             </tr>
                         ) : (
-                            filteredAircrafts.map((aircraft, rowIndex) => (
+                            displayedAircrafts.map((aircraft, rowIndex) => (
                                 <tr key={aircraft.id} data-row={rowIndex} className={`group transition-colors h-10 border-b ${isDarkMode ? 'hover:bg-slate-800/50 border-slate-800/50' : 'hover:bg-slate-50 border-slate-200'}`}>
                                     {COLUMNS.map((col, colIndex) => {
                                         const isFocused = focusedCell?.rowId === aircraft.id && focusedCell?.col === colIndex;

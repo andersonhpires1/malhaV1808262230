@@ -2201,7 +2201,7 @@ export const GridOps: React.FC<GridOpsProps> = ({
             onKeyDown={(e) =>
               handleKeyDown(e, row.id, colKey as string, rowIndex, colIndex)
             }
-            className={`w-full h-full px-1 flex items-center relative ${colKey === "airlineCode" ? "justify-start ml-2" : "justify-center"} font-mono text-[12px] select-none cursor-default outline-none ${
+            className={`w-full h-full ${colKey === "airlineCode" ? "p-0 justify-center" : "px-1 justify-center"} flex items-center relative font-mono text-[12px] select-none cursor-default outline-none ${
               isFocused
                 ? (isRemota ? "!bg-[#fff700] !text-slate-950 !border-2 !border-yellow-400 shadow-xl z-20 font-black" : "!bg-blue-500 !text-white !border-2 !border-blue-400 shadow-xl z-20 font-black")
                 : `${cellStyle} ${isRemota ? "bg-[#fff700] text-[#524f4f]" : ""} ${isOverlappingPosition ? (isDarkMode ? "!text-amber-400 font-extrabold" : "!text-amber-950 font-extrabold") : ""}`
@@ -2209,9 +2209,11 @@ export const GridOps: React.FC<GridOpsProps> = ({
           >
             {extraLabel}
             {colKey === "airlineCode" ? (
-              <span className="font-extrabold uppercase text-[11px] truncate max-w-[80px]" title={row.airline || row.airlineCode}>
-                {formatAirlineName(row.airline || row.airlineCode || "")}
-              </span>
+              <AirlineLogo 
+                airlineCode={row.airlineCode || row.airline || ""} 
+                size="cell" 
+                showName={false} 
+              />
             ) : (
               value || "--"
             )}
@@ -3671,30 +3673,11 @@ export const GridOps: React.FC<GridOpsProps> = ({
           >
             {label}
           </span>
-          <div className="flex items-center justify-center transition-all">
-            {isActive ? (
-              sortConfig.direction === "asc" ? (
-                <ArrowUp
-                  size={10}
-                  className={isDarkMode ? "text-emerald-500" : "text-slate-100"}
-                />
-              ) : (
-                <ArrowDown
-                  size={10}
-                  className={isDarkMode ? "text-emerald-500" : "text-slate-100"}
-                />
-              )
-            ) : (
-              <ArrowUpDown
-                size={8}
-                className={
-                  isDarkMode
-                    ? "text-white/20 group-hover:text-white/60"
-                    : "text-slate-200 group-hover:text-white"
-                }
-              />
-            )}
-          </div>
+          {isActive && (
+            <span className="text-[9px] text-amber-300 font-black">
+              {sortConfig.direction === "desc" ? "▼" : "▲"}
+            </span>
+          )}
         </div>
       </th>
     );
@@ -4109,7 +4092,7 @@ export const GridOps: React.FC<GridOpsProps> = ({
                       <SortableHeader
                         label="CIA"
                         columnKey="airlineCode"
-                        className="text-center w-16"
+                        className="text-center w-14"
                       />
                     )}
                     {isColVisible("flightNumber") && (
@@ -4203,7 +4186,7 @@ export const GridOps: React.FC<GridOpsProps> = ({
                       <SortableHeader
                         label="CIA"
                         columnKey="airlineCode"
-                        className="text-center w-16"
+                        className="text-center w-14"
                       />
                     )}
                     {isColVisible("flightNumber") && (
@@ -4341,7 +4324,7 @@ export const GridOps: React.FC<GridOpsProps> = ({
                       <SortableHeader
                         label="CIA"
                         columnKey="airlineCode"
-                        className="text-center w-16"
+                        className="text-center w-14"
                       />
                     )}
                     {isColVisible("flightNumber") && (
@@ -4461,7 +4444,7 @@ export const GridOps: React.FC<GridOpsProps> = ({
                       <SortableHeader
                         label="CIA"
                         columnKey="airlineCode"
-                        className="text-center w-16"
+                        className="text-center w-14"
                       />
                     )}
                     {isColVisible("flightNumber") && (

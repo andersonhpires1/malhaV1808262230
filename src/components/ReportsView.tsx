@@ -241,11 +241,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ flights, initialFlight
           <span className={`font-black text-[9px] uppercase tracking-wider transition-colors ${isActive ? 'text-emerald-400' : isDarkMode ? 'text-slate-400 group-hover:text-white' : 'text-slate-500 group-hover:text-slate-900'}`}>
             {label}
           </span>
-          <div className="flex items-center justify-center transition-all">
-            {isActive ? (
-                sortConfig.direction === 'asc' ? <ArrowUp size={10} className="text-emerald-500" /> : <ArrowDown size={10} className="text-emerald-500" />
-            ) : <div className="w-2.5 h-2.5"></div>}
-          </div>
+          {isActive && (
+            <span className="text-[9px] text-amber-300 font-black">
+              {sortConfig.direction === 'desc' ? '▼' : '▲'}
+            </span>
+          )}
         </div>
       </th>
     );
