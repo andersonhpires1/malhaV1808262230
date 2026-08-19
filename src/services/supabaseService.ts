@@ -1113,6 +1113,7 @@ export const upsertFlight = async (flight: FlightData): Promise<void> => {
     departure_flight_number: flight.departureFlightNumber,
     airline: flight.airline,
     airline_code: flight.airlineCode,
+    companhia_id: flight.companhia_id || null,
     model: flight.model,
     registration: flight.registration,
     origin: flight.origin,
@@ -1194,7 +1195,7 @@ export const upsertFlight = async (flight: FlightData): Promise<void> => {
   }
 
   if (errorToThrow) {
-    if (errorToThrow.message.includes("Could not find the table") || errorToThrow.message.includes("relation") && errorToThrow.message.includes("does not exist")) {
+    if (errorToThrow.message.includes("Could not find the table") || (errorToThrow.message.includes("relation") && errorToThrow.message.includes("does not exist"))) {
         throw new Error(`ESTRUTURA DA TABELA INVÁLIDA!\nVá ao SQL Editor no Supabase e rode o script abaixo para criar a tabela:\n\n` +
           `CREATE TABLE IF NOT EXISTS malha_operacional (\n` +
           `  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n` +
@@ -1203,6 +1204,7 @@ export const upsertFlight = async (flight: FlightData): Promise<void> => {
           `  departure_flight_number TEXT,\n` +
           `  airline TEXT,\n` +
           `  airline_code TEXT,\n` +
+          `  companhia_id UUID REFERENCES public.companhias(id) ON DELETE SET NULL,\n` +
           `  model TEXT,\n` +
           `  registration TEXT,\n` +
           `  origin TEXT,\n` +
@@ -1240,6 +1242,7 @@ export const upsertFlight = async (flight: FlightData): Promise<void> => {
           `  ADD COLUMN IF NOT EXISTS date_ref text, \n` +
           `  ADD COLUMN IF NOT EXISTS airline text, \n` +
           `  ADD COLUMN IF NOT EXISTS airline_code text, \n` +
+          `  ADD COLUMN IF NOT EXISTS companhia_id uuid, \n` +
           `  ADD COLUMN IF NOT EXISTS model text, \n` +
           `  ADD COLUMN IF NOT EXISTS registration text, \n` +
           `  ADD COLUMN IF NOT EXISTS departure_flight_number text, \n` +
@@ -1518,6 +1521,7 @@ export const bulkInsertFlights = async (flights: FlightData[]): Promise<void> =>
       departure_flight_number: flight.departureFlightNumber,
       airline: flight.airline,
       airline_code: flight.airlineCode,
+      companhia_id: flight.companhia_id || null,
       model: flight.model,
       registration: flight.registration,
       origin: flight.origin,
@@ -1613,6 +1617,7 @@ export const bulkInsertFlights = async (flights: FlightData[]): Promise<void> =>
               `  departure_flight_number TEXT,\n` +
               `  airline TEXT,\n` +
               `  airline_code TEXT,\n` +
+              `  companhia_id UUID REFERENCES public.companhias(id) ON DELETE SET NULL,\n` +
               `  model TEXT,\n` +
               `  registration TEXT,\n` +
               `  origin TEXT,\n` +
@@ -1650,6 +1655,7 @@ export const bulkInsertFlights = async (flights: FlightData[]): Promise<void> =>
               `  ADD COLUMN IF NOT EXISTS date_ref text, \n` +
               `  ADD COLUMN IF NOT EXISTS airline text, \n` +
               `  ADD COLUMN IF NOT EXISTS airline_code text, \n` +
+              `  ADD COLUMN IF NOT EXISTS companhia_id uuid, \n` +
               `  ADD COLUMN IF NOT EXISTS model text, \n` +
               `  ADD COLUMN IF NOT EXISTS registration text, \n` +
               `  ADD COLUMN IF NOT EXISTS departure_flight_number text, \n` +

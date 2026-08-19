@@ -259,24 +259,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, isDa
                     </a>
                  )}
 
-                 {(!visibleTabs || visibleTabs.AIRCRAFTS_ADMIN !== false) && (
-                   <a
-                      href="/AIRCRAFTS_ADMIN"
-                      onClick={(e) => {
-                        if (e.ctrlKey || e.metaKey) return;
-                        e.preventDefault();
-                        onViewChange('AIRCRAFTS_ADMIN');
-                        setIsMenuOpen(false);
-                      }}
-                      className={`w-full justify-start flex items-center gap-3 p-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors ${
-                        activeView === 'AIRCRAFTS_ADMIN' 
-                          ? (isDarkMode ? 'bg-indigo-600 text-white' : 'bg-emerald-650 text-white')
-                          : (isDarkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-100')
-                      }`}
-                    >
-                      <Plane size={14} className="shrink-0" /> <span className="text-left w-full">AERONAVES_BD</span>
-                    </a>
-                 )}
+
                </div>
              )}
 

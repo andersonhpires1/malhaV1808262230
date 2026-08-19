@@ -39,6 +39,23 @@ export const DesigOpr: React.FC<DesigOprProps> = ({
            posType === 'REMOTA';
   }, [flight]);
 
+  const operatorsWithVehicle = useMemo(() => {
+    return operators.filter(op => {
+      const isLinked = (op.assignedVehicle && op.assignedVehicle.trim() !== '') || 
+                       (vehicles && vehicles.some(v => v.operatorId === op.id));
+      return !!isLinked;
+    });
+  }, [operators, vehicles]);
+
+  const filteredOperators = useMemo(() => {
+    return operatorsWithVehicle.filter(op => {
+      if (activeTab === 'CTA') {
+        return op.habilitationCTA || op.role?.includes('CTA') || op.vehicleType === 'CTA';
+      }
+      return true;
+    });
+  }, [operatorsWithVehicle, activeTab]);
+
   useEffect(() => {
     if (isOpen) {
       setSelectedOperatorId(null);
@@ -51,13 +68,6 @@ export const DesigOpr: React.FC<DesigOprProps> = ({
   }, [isOpen, isCtaMandatory]);
 
   if (!isOpen) return null;
-
-  const filteredOperators = operators.filter(op => {
-    if (activeTab === 'CTA') {
-      return op.habilitationCTA || op.role?.includes('CTA') || op.vehicleType === 'CTA';
-    }
-    return true;
-  });
 
   const handleConfirm = () => {
     if (selectedOperatorId) {
@@ -82,7 +92,7 @@ export const DesigOpr: React.FC<DesigOprProps> = ({
               </h3>
               <p className="text-[11px] text-slate-400 font-mono">
                 {flight?.parkingPosition ? `Posição: ${flight.parkingPosition} • ` : ''}
-                {operators.length} operador(es) disponível(is)
+                {operatorsWithVehicle.length} operador(es) ativo(s) com viatura
               </p>
             </div>
           </div>
@@ -118,8 +128,22 @@ export const DesigOpr: React.FC<DesigOprProps> = ({
           </button>
         </div>
 
+        {/* Banner Informativo de Regras */}
+        <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 rounded-xl p-3.5 flex gap-3 text-[11px] leading-relaxed font-mono">
+          <AlertTriangle size={18} className="shrink-0 text-amber-450 mt-0.5" />
+          <div className="space-y-1">
+            <span className="font-bold uppercase tracking-wider block text-amber-200">Requisito de Designação</span>
+            <p>
+              Não é possível designar um colaborador para atendimento de voo sem que ele tenha uma viatura/frota agregada ao seu nome.
+            </p>
+            <p className="text-slate-400">
+              Caso o operador desejado não apareça listado abaixo, certifique-se de primeiramente vincular o colaborador à respectiva viatura na seção <strong className="text-slate-200">Mesa de Operadores (Escala / HUD de Equipe)</strong> para depois designá-lo ao voo.
+            </p>
+          </div>
+        </div>
+
         {/* Operators List */}
-        <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
+        <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
           {filteredOperators.length === 0 ? (
             <div className="text-center py-8 text-slate-500 font-mono text-xs">
               Nenhum operador disponível para este filtro
@@ -127,6 +151,10 @@ export const DesigOpr: React.FC<DesigOprProps> = ({
           ) : (
             filteredOperators.map((op) => {
               const isSelected = selectedOperatorId === op.id;
+              const vehicleDisplay = op.assignedVehicle 
+                ? op.assignedVehicle.replace('SRV-', '').replace('CTA-', '')
+                : (vehicles && vehicles.find(v => v.operatorId === op.id)?.id);
+
               return (
                 <button
                   key={op.id}
@@ -144,7 +172,14 @@ export const DesigOpr: React.FC<DesigOprProps> = ({
                       {op.warName?.substring(0, 2).toUpperCase() || 'OP'}
                     </div>
                     <div>
-                      <div className="text-xs font-black font-mono tracking-wide text-white">{op.warName}</div>
+                      <div className="text-xs font-black font-mono tracking-wide text-white flex items-center gap-1.5 flex-wrap">
+                        <span>{op.warName}</span>
+                        {vehicleDisplay && (
+                          <span className="px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[8px] font-mono font-black uppercase tracking-wider">
+                            VTR: {vehicleDisplay}
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[10px] text-slate-400 font-mono">{op.name} • {op.role || 'Operador'}</div>
                     </div>
                   </div>
