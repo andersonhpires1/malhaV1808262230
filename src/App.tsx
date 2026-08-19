@@ -1,0 +1,1248 @@
+import React, { useState, useEffect, Suspense, lazy, useCallback, useMemo, useRef } from 'react';
+import { ViewState, FlightData, Vehicle, MeshFlight } from './types';
+
+import { getLocalTodayDateStr } from './utils/shiftUtils';
+import { DashboardHeader } from './components/DashboardHeader';
+import { Spinner } from './components/ui/Spinner';
+import { useTheme } from './contexts/ThemeContext';
+import { useAuth } from './contexts/AuthContext';
+import { LoginScreen } from './components/LoginScreen';
+import { AlertModal } from './components/modals/AlertModal';
+import { Table, X, AlertCircle, ChevronLeft } from 'lucide-react';
+import { OperatorProfile } from './types';
+import { ShiftOperatorsSection } from './components/ShiftOperatorsSection';
+import { Sidebar } from './components/Sidebar';
+import { OperationalMesh } from './components/OperationalMesh';
+import { ReportsView } from './components/ReportsView';
+import { OperatorsAdmin } from './components/OperatorsAdmin';
+import { FleetsAdmin } from './components/FleetsAdmin';
+import { AircraftsAdmin } from './components/AircraftsAdmin';
+import { AirlinesAdmin } from './components/AirlinesAdmin';
+import { Aerodromo } from './components/Aerodromo';
+import { OperatorManager } from './components/OperatorManager';
+import { AiDashboard } from './components/AiDashboard';
+import { FlightRadarView } from './components/FlightRadarView';
+import { POSITIONS_METADATA, POSITIONS_BY_PATIO, PositionMetadata } from './constants/aerodromoConfig';
+
+import { GridOps } from './components/GridOps';
+import { AerodromoAdmin } from './components/AerodromoAdmin';
+import { LayoutPreferencesModal, UserLayoutPreferences, defaultPreferences } from './components/modals/LayoutPreferencesModal';
+
+const App: React.FC = () => {
+  const { user, loading: authLoading, warName } = useAuth();
+  const [view, setView] = useState<ViewState>(() => {
+    const validViews: ViewState[] = ['GRID_OPS', 'SHIFT_OPERATORS', 'OPERATIONAL_MESH', 'REPORTS', 'FLEET', 'OPERATORS_ADMIN', 'MANAGEMENT', 'FLEETS_ADMIN', 'AIRCRAFTS_ADMIN', 'AERODROMO', 'AERODROMO_ADMIN', 'AIRLINES_ADMIN', 'AI_DASHBOARD', 'FLIGHT_RADAR'];
+    
+    // Prioritize pathname suffix (e.g., "/REPORTS")
+    const cleanPathname = window.location.pathname.replace(/^\/|\/$/g, '').trim().toUpperCase();
+    const pathnamePart = cleanPathname.split('/')[0] as ViewState;
+    if (validViews.includes(pathnamePart)) {
+      return pathnamePart;
+    }
+    
+    // Fallback to hash
+    const hash = window.location.hash.substring(1).trim().toUpperCase() as ViewState;
+    if (validViews.includes(hash)) {
+      return hash;
+    }
+    
+    return 'GRID_OPS';
+  });
+  const [history, setHistory] = useState<ViewState[]>([]);
+
+  useEffect(() => {
+    const handleUrlChange = () => {
+      const validViews: ViewState[] = ['GRID_OPS', 'SHIFT_OPERATORS', 'OPERATIONAL_MESH', 'REPORTS', 'FLEET', 'OPERATORS_ADMIN', 'MANAGEMENT', 'FLEETS_ADMIN', 'AIRCRAFTS_ADMIN', 'AERODROMO', 'AERODROMO_ADMIN', 'AIRLINES_ADMIN', 'AI_DASHBOARD', 'FLIGHT_RADAR'];
+      
+      const cleanPathname = window.location.pathname.replace(/^\/|\/$/g, '').trim().toUpperCase();
+      const pathnamePart = cleanPathname.split('/')[0] as ViewState;
+      if (validViews.includes(pathnamePart)) {
+        setView(pathnamePart);
+        return;
+      }
+      
+      const hash = window.location.hash.substring(1).trim().toUpperCase() as ViewState;
+      if (validViews.includes(hash)) {
+        setView(hash);
+      }
+    };
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
+  }, []);
+  const [pendingAction, setPendingAction] = useState<'CREATE' | 'IMPORT' | null>(null);
+  
+  // === ESTADO DE CONFIGURAÇÃO DE LAYOUT DO USUÁRIO ===
+  const [layoutModalOpen, setLayoutModalOpen] = useState(false);
+  const [layoutPreferences, setLayoutPreferences] = useState<UserLayoutPreferences>(() => {
+    const key = `layout_prefs_${user?.user_metadata?.war_name || 'default'}`;
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return {
+          visibleTabs: { ...defaultPreferences.visibleTabs, ...parsed.visibleTabs },
+          visibleColumns: { ...defaultPreferences.visibleColumns, ...parsed.visibleColumns }
+        };
+      } catch (e) {
+        return defaultPreferences;
+      }
+    }
+    return defaultPreferences;
+  });
+
+  const [lockedColumns, setLockedColumns] = useState<Record<string, boolean>>(() => {
+    const saved = localStorage.getItem('layout_locks_columns');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return {
+      flightNumber: true,
+      positionId: true,
+      operator: true,
+      etd: true,
+    };
+  });
+
+  const [lockedTabs, setLockedTabs] = useState<Record<string, boolean>>(() => {
+    const saved = localStorage.getItem('layout_locks_tabs');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return {
+      GRID_OPS: true,
+    };
+  });
+
+  // Atualiza as preferências de layout e travas quando mudar de usuário ou inciar (carrega do Supabase com fallback local)
+  useEffect(() => {
+    if (user && user.user_metadata?.war_name) {
+      const username = user.user_metadata.war_name;
+      import('./services/supabaseService').then(async ({ getUserLayoutPreferences }) => {
+        const dbPrefs = await getUserLayoutPreferences(username);
+        if (dbPrefs) {
+          setLayoutPreferences({
+            visibleTabs: { ...defaultPreferences.visibleTabs, ...dbPrefs.visible_tabs },
+            visibleColumns: { ...defaultPreferences.visibleColumns, ...dbPrefs.visible_columns }
+          });
+          if (dbPrefs.locked_columns) {
+            setLockedColumns(dbPrefs.locked_columns);
+          }
+          if (dbPrefs.locked_tabs) {
+            setLockedTabs(dbPrefs.locked_tabs);
+          }
+        } else {
+          // Fallback para localStorage se não encontrar no banco
+          const key = `layout_prefs_${username}`;
+          const saved = localStorage.getItem(key);
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved);
+              setLayoutPreferences({
+                visibleTabs: { ...defaultPreferences.visibleTabs, ...parsed.visibleTabs },
+                visibleColumns: { ...defaultPreferences.visibleColumns, ...parsed.visibleColumns }
+              });
+            } catch (e) {}
+          } else {
+            setLayoutPreferences(defaultPreferences);
+          }
+          
+          const savedLocksCols = localStorage.getItem('layout_locks_columns');
+          if (savedLocksCols) {
+            try { setLockedColumns(JSON.parse(savedLocksCols)); } catch (e) {}
+          }
+          const savedLocksTabs = localStorage.getItem('layout_locks_tabs');
+          if (savedLocksTabs) {
+            try { setLockedTabs(JSON.parse(savedLocksTabs)); } catch (e) {}
+          }
+        }
+      }).catch(err => {
+        console.error('[App] Failed to load layout preferences:', err);
+      });
+    } else {
+      setLayoutPreferences(defaultPreferences);
+    }
+  }, [user]);
+
+  const handleSavePreferences = useCallback(async (
+    newPrefs: UserLayoutPreferences,
+    newLocksCols: Record<string, boolean>,
+    newLocksTabs: Record<string, boolean>
+  ) => {
+    setLayoutPreferences(newPrefs);
+    setLockedColumns(newLocksCols);
+    setLockedTabs(newLocksTabs);
+    
+    const username = user?.user_metadata?.war_name || 'default';
+    const key = `layout_prefs_${username}`;
+    localStorage.setItem(key, JSON.stringify(newPrefs));
+    localStorage.setItem('layout_locks_columns', JSON.stringify(newLocksCols));
+    localStorage.setItem('layout_locks_tabs', JSON.stringify(newLocksTabs));
+
+    if (user && user.user_metadata?.war_name) {
+      try {
+        const { saveUserLayoutPreferences } = await import('./services/supabaseService');
+        await saveUserLayoutPreferences(
+          username,
+          newPrefs.visibleColumns,
+          newPrefs.visibleTabs,
+          newLocksCols,
+          newLocksTabs
+        );
+      } catch (err: any) {
+        console.warn('[App] Não foi possível sincronizar as preferências no Supabase (Mesa sem tabela correspondente). Salvo em cache local de navegação:', err.message);
+      }
+    }
+  }, [user]);
+
+  // === ESTADO CENTRALIZADO (A VERDADE ÚNICA) ===
+  const [globalFlights, setGlobalFlights] = useState<FlightData[]>(() => {
+    const saved = localStorage.getItem('globalFlights');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.map((f: any) => ({
+          ...f,
+          designationTime: f.designationTime ? new Date(f.designationTime) : undefined,
+          assignmentTime: f.assignmentTime ? new Date(f.assignmentTime) : undefined,
+          startTime: f.startTime ? new Date(f.startTime) : undefined,
+          endTime: f.endTime ? new Date(f.endTime) : undefined,
+          logs: f.logs ? f.logs.map((l: any) => ({ ...l, timestamp: new Date(l.timestamp) })) : [],
+          messages: f.messages ? f.messages.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) })) : []
+        }));
+      } catch (e) {
+      }
+    }
+    return [];
+  });
+
+  const [sessionDensity, setSessionDensity] = useState(() => {
+    const cached = localStorage.getItem('session_density');
+    return cached ? Number(cached) : 0.803;
+  });
+
+  const [sessionTemperature, setSessionTemperature] = useState(() => {
+    const cached = localStorage.getItem('session_temp');
+    return cached ? Number(cached) : 24.5;
+  });
+
+  const updateDensity = useCallback((val: number) => {
+    setSessionDensity(val);
+    localStorage.setItem('session_density', String(val));
+  }, []);
+
+  const updateTemperature = useCallback((val: number) => {
+    setSessionTemperature(val);
+    localStorage.setItem('session_temp', String(val));
+  }, []);
+
+  const [globalVehicles, setGlobalVehicles] = useState<Vehicle[]>([]);
+  const [globalOperators, setGlobalOperators] = useState<OperatorProfile[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [supabaseError, setSupabaseError] = useState<string | null>(null);
+  const [isSupabaseOffline, setIsSupabaseOffline] = useState(false);
+  const lastManualActionRef = useRef<number>(0);
+
+  const handleManualFlightsUpdate = useCallback((action: React.SetStateAction<FlightData[]>) => {
+    setGlobalFlights(action);
+    lastManualActionRef.current = Date.now();
+  }, []);
+
+  // Escuta o status online/offline do Supabase
+  useEffect(() => {
+    const handleNetworkState = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        setIsSupabaseOffline(!!customEvent.detail.offline);
+      }
+    };
+    window.addEventListener('supabase-network-state', handleNetworkState);
+    
+    const handleMissingTables = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail && customEvent.detail.length > 0) {
+        const tables = customEvent.detail as string[];
+        const tablesFormatted = tables.map(t => `"${t}"`).join(', ');
+        
+        let instruction = `Estrutura do banco de dados incompleta: tabelas ausentes (${tablesFormatted}).\n\n`;
+        instruction += `Para habilitar a persistência inteira via Supabase (MALHA Enterprise), acesse o SQL Editor no painel do Supabase do seu projeto e execute o script abaixo:\n\n`;
+        
+        if (tables.includes('malha_operacional')) {
+          instruction += `-- Criar tabela de Malha Operacional\n`;
+          instruction += `CREATE TABLE IF NOT EXISTS public.malha_operacional (\n`;
+          instruction += `    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n`;
+          instruction += `    date_ref TEXT NOT NULL,\n`;
+          instruction += `    flight_number TEXT NOT NULL,\n`;
+          instruction += `    departure_flight_number TEXT,\n`;
+          instruction += `    airline TEXT, airline_code TEXT,\n`;
+          instruction += `    model TEXT, registration TEXT, origin TEXT, destination TEXT,\n`;
+          instruction += `    eta TEXT, etd TEXT, actual_arrival_time TEXT, position_id TEXT,\n`;
+          instruction += `    position_type TEXT, pit_id TEXT, wing_side TEXT,\n`;
+          instruction += `    fuel_status INTEGER DEFAULT 0, status TEXT DEFAULT 'CHEGADA'::text NOT NULL,\n`;
+          instruction += `    volume INTEGER DEFAULT 0, is_on_ground BOOLEAN DEFAULT false,\n`;
+          instruction += `    delay_justification TEXT, designation_time TIMESTAMP WITH TIME ZONE,\n`;
+          instruction += `    start_time TIMESTAMP WITH TIME ZONE, end_time TIMESTAMP WITH TIME ZONE,\n`;
+          instruction += `    assignment_time TIMESTAMP WITH TIME ZONE, assigned_by_lt TEXT,\n`;
+          instruction += `    is_excluded_from_queue BOOLEAN DEFAULT false, report JSONB DEFAULT '{}'::jsonb,\n`;
+          instruction += `    logs JSONB DEFAULT '[]'::jsonb, operator_id UUID,\n`;
+          instruction += `    support_operator_id UUID, support_operator TEXT,\n`;
+          instruction += `    vehicle_id UUID, vehicle_type TEXT,\n`;
+          instruction += `    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,\n`;
+          instruction += `    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n`;
+          instruction += `);\n\n`;
+        }
+        
+        if (tables.includes('malha_dia')) {
+          instruction += `-- Criar tabela de Malha Dia (Base Mesh)\n`;
+          instruction += `CREATE TABLE IF NOT EXISTS public.malha_dia (\n`;
+          instruction += `    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n`;
+          instruction += `    date TEXT NOT NULL,\n`;
+          instruction += `    airline TEXT, airline_code TEXT, flight_number TEXT,\n`;
+          instruction += `    departure_flight_number TEXT, destination TEXT, etd TEXT,\n`;
+          instruction += `    registration TEXT, eta TEXT, position_id TEXT,\n`;
+          instruction += `    actual_arrival_time TEXT, model TEXT, is_disabled BOOLEAN DEFAULT false,\n`;
+          instruction += `    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,\n`;
+          instruction += `    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n`;
+          instruction += `);\n\n`;
+        }
+        
+        setSupabaseError(instruction);
+      }
+    };
+    window.addEventListener('supabase-missing-tables', handleMissingTables);
+    
+    return () => {
+      window.removeEventListener('supabase-network-state', handleNetworkState);
+      window.removeEventListener('supabase-missing-tables', handleMissingTables);
+    };
+  }, []);
+
+  useEffect(() => {
+    import('./services/supabaseService').then(async ({ getVehicles, getOperators, getAerodromoConfig }) => {
+      try {
+        const [vehicles, operators, aerodromoConfig] = await Promise.all([
+          getVehicles(),
+          getOperators(),
+          getAerodromoConfig()
+        ]);
+        
+        let enrichedVehicles = vehicles || [];
+        if (vehicles && vehicles.length > 0 && operators && operators.length > 0) {
+          enrichedVehicles = vehicles.map(v => {
+            const op = operators.find(o => o.id === v.operatorId);
+            return { ...v, operatorName: op ? op.warName : undefined };
+          });
+        }
+
+        if (enrichedVehicles && enrichedVehicles.length > 0) {
+          setGlobalVehicles(enrichedVehicles);
+        }
+
+        if (operators && operators.length > 0) {
+          const mappedOperators = operators.map(op => {
+             const assignedVeh = enrichedVehicles?.find(v => v.operatorId === op.id);
+             return { ...op, assignedVehicle: assignedVeh ? `${assignedVeh.type === 'CTA' ? 'CTA' : 'SRV'}-${assignedVeh.id}` : undefined };
+          });
+          setGlobalOperators(mappedOperators);
+        }
+
+
+
+        if (aerodromoConfig) {
+          if (aerodromoConfig.positions_metadata && Object.keys(aerodromoConfig.positions_metadata).length > 0) {
+            setPositionsMetadata(aerodromoConfig.positions_metadata);
+          }
+          if (aerodromoConfig.position_restrictions && Object.keys(aerodromoConfig.position_restrictions).length > 0) {
+             setPositionRestrictions(aerodromoConfig.position_restrictions);
+          }
+          if (aerodromoConfig.disabled_positions && aerodromoConfig.disabled_positions.length > 0) {
+            setDisabledPositions(new Set(aerodromoConfig.disabled_positions));
+          }
+          if (aerodromoConfig.patio_positions && Object.keys(aerodromoConfig.patio_positions).length > 0) {
+            setPatioPositions(aerodromoConfig.patio_positions);
+          }
+        }
+        
+        if (vehicles.length === 0 && operators.length === 0) {
+             console.warn('Conectado com sucesso mas sem frota e operadores no banco.');
+        }
+      } catch (err: any) {
+        console.error('Failed to load base data from Supabase, entering contingency offline mode:', err);
+        setIsSupabaseOffline(true);
+      }
+    }).catch(err => {
+      console.error('Failed to import supabaseService, entering contingency offline mode:', err);
+      setIsSupabaseOffline(true);
+    });
+  }, []);
+
+  const [meshFlightsByDate, setMeshFlightsByDate] = useState<Record<string, MeshFlight[]>>({});
+
+
+
+
+  const [currentMeshDate, setCurrentMeshDate] = useState<string>(
+      () => getLocalTodayDateStr()
+  );
+  
+  const [isGridEditing, setIsGridEditing] = useState(false);
+  const isEditingRef = useRef(isGridEditing);
+  useEffect(() => {
+    isEditingRef.current = isGridEditing;
+  }, [isGridEditing]);
+
+  // REAL-TIME SYNC POLLING
+  useEffect(() => {
+    if (!user) return; // Only sync if authenticated
+    
+    const performSync = (force: boolean = false) => {
+      if (isEditingRef.current && !force) return;
+      
+      // Cooldown de 8 segundos após ação manual para evitar race conditions
+      const timeSinceLastAction = Date.now() - lastManualActionRef.current;
+      if (timeSinceLastAction < 8000 && !force) {
+        return;
+      }
+      
+      import('./services/supabaseService').then(async ({ getFlights, getOperators, getVehicles }) => {
+        try {
+          const targetDate = currentMeshDate || getLocalTodayDateStr();
+          const [flights, operators, vehicles] = await Promise.all([
+             getFlights(targetDate),
+             getOperators(),
+             getVehicles()
+          ]);
+          
+          if (flights) {
+            setGlobalFlights(prev => {
+              const now = Date.now();
+              const isRecentAction = (now - lastManualActionRef.current) < 10000; // 10s window
+
+              // 1. Manter voos de outras datas intocados
+              const otherDatesFlights = prev.filter(f => f.date && f.date !== targetDate);
+              
+              // 2. Para a data sincronizada, mesclamos em vez de substituir
+              const dateLocal = prev.filter(f => f.date === targetDate || !f.date);
+              
+              // 3. Smart Merge para evitar sobrescrever ações locais
+              let mergedDate = flights.map(dbF => {
+                 const localF = dateLocal.find(lf => lf.id === dbF.id);
+                 // Se houve uma ação recente, preservamos os dados locais (como pit_id alterado antes de salvar no DB)
+                 if (localF && isRecentAction) {
+                     return { ...dbF, ...localF };
+                 }
+                 return dbF;
+              });
+              
+              // Adicionamos voos locais que ainda NÃO estão no banco
+              dateLocal.forEach(localF => {
+                 const existsInDB = mergedDate.some(dbF => dbF.id === localF.id);
+                 if (!existsInDB) {
+                    mergedDate.push(localF); 
+                 }
+              });
+
+              const finalDate = mergedDate;
+
+              const updatedGlobal = [...otherDatesFlights, ...finalDate];
+              const isDifferent = JSON.stringify(prev) !== JSON.stringify(updatedGlobal);
+              
+              if (isDifferent) {
+                return updatedGlobal;
+              }
+              return prev;
+            });
+          }
+          
+          let enrichedVehicles = vehicles || [];
+          if (vehicles && vehicles.length > 0 && operators && operators.length > 0) {
+            enrichedVehicles = vehicles.map(v => {
+              const op = operators.find(o => o.id === v.operatorId);
+              return { ...v, operatorName: op ? op.warName : undefined };
+            });
+          }
+
+          if (operators && operators.length > 0) {
+            const mappedOperators = operators.map(op => {
+               const assignedVeh = enrichedVehicles?.find(v => v.operatorId === op.id);
+               return { ...op, assignedVehicle: assignedVeh ? `${assignedVeh.type === 'CTA' ? 'CTA' : 'SRV'}-${assignedVeh.id}` : undefined };
+            });
+            setGlobalOperators(prev => {
+              const isDifferent = JSON.stringify(prev) !== JSON.stringify(mappedOperators);
+              return isDifferent ? mappedOperators : prev;
+            });
+          }
+
+          if (enrichedVehicles && enrichedVehicles.length > 0) {
+            setGlobalVehicles(prev => {
+              const isDifferent = JSON.stringify(prev) !== JSON.stringify(enrichedVehicles);
+              return isDifferent ? enrichedVehicles : prev;
+            });
+          }
+        } catch (e) {
+          console.error("Auto-sync failed:", e);
+        }
+      });
+    };
+
+    const syncInterval = setInterval(() => performSync(false), 10000); // 10 seconds auto-refresh Real-Time
+    
+    const handleForceRefresh = () => {
+      performSync(true);
+    };
+    window.addEventListener('supabase-force-refresh', handleForceRefresh);
+    
+    return () => {
+      clearInterval(syncInterval);
+      window.removeEventListener('supabase-force-refresh', handleForceRefresh);
+    };
+  }, [user, currentMeshDate]);
+
+  useEffect(() => {
+    if (!user) return;
+    setIsLoadingData(true);
+    import('./services/supabaseService').then(async ({ getBaseMeshFlights, getFlights }) => {
+       try {
+           const [mesh, flights] = await Promise.all([
+               getBaseMeshFlights(currentMeshDate),
+               getFlights(currentMeshDate)
+           ]);
+           
+           if (mesh && mesh.length > 0) {
+              setMeshFlightsByDate(prev => ({ ...prev, [currentMeshDate]: mesh }));
+           } else {
+              setMeshFlightsByDate(prev => ({ ...prev, [currentMeshDate]: [] }));
+           }
+           
+           setGlobalFlights(prev => {
+               const otherDates = prev.filter(f => f.date && f.date !== currentMeshDate);
+               return [...otherDates, ...(flights || [])];
+           });
+       } catch (err) {
+           console.error("Error fetching data for date: " + currentMeshDate, err);
+       } finally {
+           setIsLoadingData(false);
+       }
+    });
+  }, [currentMeshDate, user]);
+
+  const meshFlights = meshFlightsByDate[currentMeshDate] || [];
+  
+  const setMeshFlights = useCallback((action: React.SetStateAction<MeshFlight[]>) => {
+      setMeshFlightsByDate(prev => {
+          const current = prev[currentMeshDate] || [];
+          const updated = typeof action === 'function' ? action(current) : action;
+          return { ...prev, [currentMeshDate]: updated };
+      });
+  }, [currentMeshDate]);
+
+  useEffect(() => {
+    if (!localStorage.getItem('migration_no_mocks_v8')) {
+      localStorage.removeItem('globalFlights');
+      localStorage.removeItem('meshFlights');
+      localStorage.removeItem('globalOperators');
+      localStorage.removeItem('rootMeshFlights');
+      localStorage.removeItem('meshFlightsByDate');
+      localStorage.setItem('migration_no_mocks_v8', 'true');
+      
+      setTimeout(() => {
+          window.location.reload();
+      }, 500);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('meshFlights', JSON.stringify(meshFlights));
+    } catch (e) {
+      console.error('[localStorage] Erro ao salvar meshFlights localmente:', e);
+    }
+  }, [meshFlights]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('globalFlights', JSON.stringify(globalFlights));
+    } catch (e) {
+      console.error('[localStorage] Erro ao salvar globalFlights localmente:', e);
+    }
+  }, [globalFlights]);
+
+  const { isDarkMode, toggleDarkMode } = useTheme();
+  const [gridOpsInitialTab, setGridOpsInitialTab] = useState<'GERAL' | 'CHEGADA' | 'FILA' | 'DESIGNADOS' | 'ABASTECENDO' | 'FINALIZADO'>('GERAL');
+  const [isPseudoFullscreen, setIsPseudoFullscreen] = useState(false);
+  const [globalSearchTerm, setGlobalSearchTerm] = useState('');
+  const [ltName, setLtName] = useState('');
+  const [tempLtName, setTempLtName] = useState('');
+
+  useEffect(() => {
+    if (warName) setLtName(warName);
+  }, [warName]);
+
+  const isNameInvalid = false; // !ltName || ltName.trim() === ''; // disabled temporarily per user request
+
+  const toggleFullscreen = () => {
+    const doc = document as any;
+    const element = document.documentElement as any;
+
+    const isNativeFull = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+
+    if (!isNativeFull) {
+      const requestMethod = element.requestFullscreen || element.webkitRequestFullscreen || element.mozRequestFullScreen || element.msRequestFullscreen;
+      if (requestMethod) {
+        requestMethod.call(element).catch(() => {
+          // Fallback para pseudo-fullscreen se o nativo falhar (comum em iframes)
+          setIsPseudoFullscreen(true);
+        });
+      } else {
+        setIsPseudoFullscreen(true);
+      }
+    } else {
+      const exitMethod = doc.exitFullscreen || doc.webkitExitFullscreen || doc.mozCancelFullScreen || doc.msExitFullscreen;
+      if (exitMethod) {
+        exitMethod.call(doc);
+      }
+      setIsPseudoFullscreen(false);
+    }
+  };
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      const doc = document as any;
+      const isNativeFull = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+      if (!isNativeFull) setIsPseudoFullscreen(false);
+    };
+    
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    document.addEventListener('mozfullscreenchange', onFullscreenChange);
+    document.addEventListener('MSFullscreenChange', onFullscreenChange);
+    
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', onFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', onFullscreenChange);
+    };
+  }, []);
+
+   const runEndOfDayRoutine = useCallback(async () => {
+    // 1. Filtrar voos da Operação (GridOps)
+    const finishedFlights = globalFlights.filter(f => f.status === 'FINALIZADO' || f.status === 'CANCELADO');
+    const unfinishedFlights = globalFlights.filter(f => f.status !== 'FINALIZADO' && f.status !== 'CANCELADO');
+    
+    // 1.5. Exportação automática de logs de status e dados da malha em JSON para BACKUP EXTERNO do usuário
+    try {
+      const backupDateStr = currentMeshDate || getLocalTodayDateStr();
+      const backupData = {
+        title: "BACKUP EXTRATOR DE DIÁRIO DE PISTA - SISTEMA MALHA",
+        airport: "SBGR / Guarulhos",
+        exportedAt: new Date().toISOString(),
+        shiftDate: backupDateStr,
+        operationalFlights: globalFlights.filter(f => f.date === backupDateStr || !f.date),
+        baseMeshFlights: meshFlightsByDate[backupDateStr] || [],
+        vehiclesStateAtClose: globalVehicles,
+        operatorsOnDuty: globalOperators.map(op => ({
+          warName: op.warName,
+          fullName: op.fullName,
+          status: op.status,
+          role: op.role,
+          category: op.category,
+          airlines: op.airlines
+        }))
+      };
+      
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const blobUrl = URL.createObjectURL(blob);
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', blobUrl);
+      downloadAnchor.setAttribute('download', `Backup_Malha_Logs_Vibra_${backupDateStr}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      URL.revokeObjectURL(blobUrl);
+      console.log(`[Backup] Envelopado e exportado JSON de fim de turno para a data ${backupDateStr}`);
+    } catch (err) {
+      console.error("Erro na exportação automática do JSON de backup:", err);
+    }
+
+    // 2. Gerar relatório Excel dos finalizados
+    if (finishedFlights.length > 0) {
+      try {
+        const XLSX = await import('xlsx');
+        const worksheet = XLSX.utils.json_to_sheet(finishedFlights.map(f => ({
+            Voo: f.airline + ' ' + f.flightNumber,
+            VooChegada: f.departureFlightNumber,
+            Prefixo: f.prefix,
+            Destino: f.destination,
+            Status: f.status,
+            Inicio: f.startTime ? new Date(f.startTime).toLocaleTimeString('pt-BR') : '',
+            Fim: f.endTime ? new Date(f.endTime).toLocaleTimeString('pt-BR') : '',
+            Operadores: f.assignedOperatorsNames ? f.assignedOperatorsNames.join(', ') : '',
+            Equipamento: f.fleet || ''
+        })));
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Fechamento');
+        const todayStr = getLocalTodayDateStr();
+        XLSX.writeFile(workbook, `Fechamento_Diario_Voos_${todayStr}.xlsx`);
+      } catch (err) {
+        console.error("Erro exportando excel", err);
+      }
+    }
+
+    // 4. Determinar a data de amanhã
+    const todayStr = currentMeshDate;
+    const tomorrowDate = new Date(todayStr + 'T12:00:00');
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const tomorrowStr = tomorrowDate.toISOString().split('T')[0];
+
+    // 3. Limpar finalizados da visualização atual da Operação (GridOps)
+    // Mantendo os não finalizados (transferindo para a nova meta/dia)
+    const unfinishedTransferred = unfinishedFlights.map(f => ({
+        ...f,
+        date: tomorrowStr // Update the date of the active flights to tomorrow so they appear tomorrow
+    }));
+    handleManualFlightsUpdate(unfinishedTransferred);
+
+    // 4. Transferir Malha Planejada para o dia seguinte
+
+    // Pegamos a malha planejada atual
+    setMeshFlightsByDate(prev => {
+        const todayMeshFlights = prev[todayStr] || [];
+        
+        // Identificar voos da malha de hoje que NÃO foram finalizados
+        const unfinishedMeshFlights = todayMeshFlights.filter(mf => {
+             // Tenta achar o voo equivalente no globalFlights
+             const gf = globalFlights.find(
+                 f => f.airline === mf.airline && 
+                      (f.departureFlightNumber === mf.departureFlightNumber || f.flightNumber === mf.departureFlightNumber)
+             );
+             if (gf) {
+                 // Se achou no globalFlights, e está finalizado ou cancelado, ele sai da malha
+                 return gf.status !== 'FINALIZADO' && gf.status !== 'CANCELADO';
+             }
+             // Se não achou no global, quer dizer que nem foi iniciado. Devemos transferir.
+             return true;
+        });
+
+        // Modificamos a data dos voos transferidos para garantir
+        const transferredMeshFlights = unfinishedMeshFlights.map(mf => ({
+            ...mf,
+            date: tomorrowStr
+        }));
+
+        const existingTomorrow = prev[tomorrowStr] || [];
+
+        return {
+            ...prev,
+            [todayStr]: [], // Limpa a malha de hoje
+            [tomorrowStr]: [...existingTomorrow, ...transferredMeshFlights] // Move para a de amanhã
+        };
+    });
+
+    setCurrentMeshDate(tomorrowStr); // Avança o componente visual para a data de amanhã
+
+    // 5. Alert de sistema
+    setEndOfDayAlert({
+      isOpen: true,
+      title: 'FECHAMENTO DIÁRIO',
+      message: (
+        <div className="flex flex-col gap-3 text-left">
+          <p>O dia foi encerrado com sucesso.</p>
+          <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-lg">
+            <p className="font-bold text-emerald-600 dark:text-emerald-400">
+              {finishedFlights.length} voos finalizados / cancelados
+            </p>
+            <p className="text-xs mt-1">Foram incluídos no Relatório Excel (baixado automaticamente) e removidos do painel e da malha.</p>
+          </div>
+          <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-lg">
+            <p className="font-bold text-amber-600 dark:text-amber-400">
+              {unfinishedFlights.length} voos pendentes
+            </p>
+            <p className="text-xs mt-1">Transitaram automaticamente para a malha de {tomorrowStr.split('-').reverse().join('/')} (mantidos na tela).</p>
+          </div>
+        </div>
+      )
+    });
+  }, [globalFlights, currentMeshDate]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+        const now = new Date();
+        // Dispara o fechamento na virada do dia exatamente (23:59:59)
+        if (now.getHours() === 23 && now.getMinutes() === 59 && now.getSeconds() === 59) {
+            runEndOfDayRoutine();
+        }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [runEndOfDayRoutine]);
+
+  const [showExitWarning, setShowExitWarning] = useState<{ id: string } | null>(null);
+  const [targetView, setTargetView] = useState<ViewState | null>(null);
+  const [targetReportFlight, setTargetReportFlight] = useState<FlightData | null>(null);
+
+  const [endOfDayAlert, setEndOfDayAlert] = useState<{ isOpen: boolean; title: string; message: React.ReactNode }>({
+    isOpen: false,
+    title: '',
+    message: ''
+  });
+
+  const [disabledPositions, setDisabledPositions] = useState<Set<string>>(() => {
+    const saved = localStorage.getItem('disabledPositions');
+    return saved ? new Set(JSON.parse(saved)) : new Set(['208', '212L']);
+  });
+
+  const [positionsMetadata, setPositionsMetadata] = useState<Record<string, PositionMetadata>>(() => {
+    const saved = localStorage.getItem('positionsMetadata');
+    return saved ? JSON.parse(saved) : POSITIONS_METADATA;
+  });
+
+  const [patioPositions, setPatioPositions] = useState<Record<string, string[]>>(() => {
+    const saved = localStorage.getItem('patioPositions');
+    return saved ? JSON.parse(saved) : POSITIONS_BY_PATIO;
+  });
+
+  const [positionRestrictions, setPositionRestrictions] = useState<Record<string, 'HYBRID' | 'CTA' | 'SRV'>>(() => {
+    const saved = localStorage.getItem('positionRestrictions');
+    
+    const initial: Record<string, 'HYBRID' | 'CTA' | 'SRV'> = {};
+    Object.entries(POSITIONS_METADATA).forEach(([id, meta]) => {
+      initial[id] = (meta as any).type === 'REMOTA' ? 'CTA' : 'HYBRID';
+    });
+
+    if (saved) {
+        const parsed = JSON.parse(saved);
+        return { ...initial, ...parsed };
+    }
+    return initial;
+  });
+
+  const syncAerodromoConfig = useCallback(async (updates: Partial<any>) => {
+    try {
+       const { updateAerodromoConfig } = await import('./services/supabaseService');
+       await updateAerodromoConfig({
+          patio_positions: patioPositions,
+          positions_metadata: positionsMetadata,
+          position_restrictions: positionRestrictions,
+          disabled_positions: Array.from(disabledPositions),
+          ...updates // Override the specific piece changing at this moment
+       });
+    } catch(err) {
+       console.error("Failed to sync aerodromo config", err);
+    }
+  }, [patioPositions, positionsMetadata, positionRestrictions, disabledPositions]);
+
+  useEffect(() => {
+    const serialized = Array.from(disabledPositions);
+    localStorage.setItem('disabledPositions', JSON.stringify(serialized));
+    syncAerodromoConfig({ disabled_positions: serialized });
+  }, [disabledPositions]);
+
+  useEffect(() => {
+    localStorage.setItem('positionsMetadata', JSON.stringify(positionsMetadata));
+    syncAerodromoConfig({ positions_metadata: positionsMetadata });
+  }, [positionsMetadata]);
+
+  useEffect(() => {
+    localStorage.setItem('patioPositions', JSON.stringify(patioPositions));
+    syncAerodromoConfig({ patio_positions: patioPositions });
+  }, [patioPositions]);
+
+  useEffect(() => {
+    localStorage.setItem('positionRestrictions', JSON.stringify(positionRestrictions));
+    syncAerodromoConfig({ position_restrictions: positionRestrictions });
+  }, [positionRestrictions]);
+
+  const clearAllPositionAssignments = useCallback(async () => {
+    try {
+      const { clearAllFlightAssignments } = await import('./services/supabaseService');
+      
+      // 1. Update local state IMEDIATAMENTE (Otimista)
+      setGlobalFlights(prev => prev.map(f => ({ ...f, positionId: '', pitId: undefined, positionType: undefined })));
+      
+      // 2. Persist no Banco de Dados (Todas as datas)
+      await clearAllFlightAssignments();
+      
+      alert("⚠️ SUCESSO: Todas as posições de pátio foram liberadas no sistema e no banco de dados.");
+      window.location.reload();
+    } catch (err) {
+      console.error('Falha crítica na limpeza global:', err);
+      alert('Erro ao sincronizar limpeza. Verifique sua conexão com o Supabase.');
+    }
+  }, []);
+
+  const handleViewChange = (newView: ViewState) => {
+    if (newView !== view) {
+      setHistory(prev => {
+        if (prev.length > 0 && prev[prev.length - 1] === view) {
+          return prev;
+        }
+        return [...prev, view];
+      });
+    }
+    window.history.pushState(null, '', '/' + newView);
+    setView(newView);
+    if (newView !== 'REPORTS') {
+      setTargetReportFlight(null);
+    }
+  };
+
+  const handleGoBack = () => {
+    setHistory(prev => {
+      if (prev.length === 0) return prev;
+      const newStack = [...prev];
+      const prevView = newStack.pop();
+      if (prevView) {
+        window.history.pushState(null, '', '/' + prevView);
+        setView(prevView);
+        if (prevView !== 'REPORTS') {
+          setTargetReportFlight(null);
+        }
+      }
+      return newStack;
+    });
+  };
+
+  const handleConfirmExit = (action: 'CANCEL' | 'EDIT') => {
+    setShowExitWarning(null);
+    setTargetView(null);
+  };
+
+  if (authLoading) {
+    return (
+      <div className={`${isDarkMode ? 'dark bg-slate-950' : 'bg-slate-50'} min-h-screen flex items-center justify-center`}>
+        <Spinner size="lg" className="text-blue-500" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginScreen />;
+  }
+
+  const currentLtProfile = globalOperators.find(op => {
+    const normalizeString = (str?: string) => str?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase() || '';
+    const ln = normalizeString(ltName);
+    const wn = normalizeString(op.warName);
+    const fn = normalizeString(op.fullName);
+    if (!ln) return false;
+    return wn === ln || fn === ln || (fn && fn.includes(ln));
+  });
+
+  return (
+    <div className={`${isDarkMode ? 'dark bg-slate-950' : 'bg-slate-50'} ${isPseudoFullscreen ? 'fixed inset-0 z-[9999]' : 'h-[100dvh] w-full'} overflow-hidden flex flex-col`}>
+      <DashboardHeader 
+        isDarkMode={isDarkMode} 
+        toggleDarkMode={toggleDarkMode} 
+        isFullscreen={isPseudoFullscreen} 
+        onToggleFullscreen={toggleFullscreen} 
+        globalSearchTerm={globalSearchTerm}
+        setGlobalSearchTerm={setGlobalSearchTerm}
+        ltName={ltName}
+        ltPhotoUrl={currentLtProfile?.photoUrl}
+        setLtName={setLtName}
+        operators={globalOperators}
+        onOpenLayoutPrefs={() => setLayoutModalOpen(true)}
+        density={sessionDensity}
+        setDensity={updateDensity}
+        temperature={sessionTemperature}
+        setTemperature={updateTemperature}
+        isSupabaseOffline={isSupabaseOffline}
+      />
+
+      {supabaseError && (
+        <div className="bg-red-500 text-white p-4 font-bold flex items-start justify-between z-[9999]">
+            <div className="flex items-start gap-4 flex-1">
+                <AlertCircle size={24} className="mt-1 flex-shrink-0" />
+                <div className="flex flex-col gap-2">
+                    <span className="text-lg">Problema com o Banco de Dados</span>
+                    <span className="font-normal whitespace-pre-line">{supabaseError}</span>
+                </div>
+            </div>
+            <button onClick={() => setSupabaseError(null)} className="hover:bg-red-600 p-1 rounded transition-colors"><X size={20}/></button>
+        </div>
+      )}
+
+      {isNameInvalid && (
+        <div className="fixed inset-x-0 bottom-0 top-20 z-[9999] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className={`border ${isDarkMode ? 'bg-slate-900 border-emerald-500/30' : 'bg-white border-[#004D24]/30'} rounded-xl p-8 max-w-md w-full shadow-2xl text-center relative overflow-hidden`}>
+                <div className={`absolute top-0 inset-x-0 h-1 ${isDarkMode ? 'bg-gradient-to-r from-emerald-600 via-emerald-400 to-emerald-600' : 'bg-[#004D24]'} animate-pulse`}></div>
+                <h2 className={`text-2xl font-black ${isDarkMode ? 'text-white' : 'text-slate-900'} mb-2 tracking-tight uppercase`}>PRIMEIRO ACESSO</h2>
+                <p className={`${isDarkMode ? 'text-slate-400' : 'text-slate-600'} mb-6 font-medium leading-relaxed`}>Por favor, insira o seu nome abaixo para acessar e operar o sistema.</p>
+                
+                <div className="flex flex-col items-center gap-4 mb-8">
+                    <input 
+                        type="text" 
+                        value={tempLtName}
+                        onChange={(e) => setTempLtName(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && tempLtName.trim()) {
+                                setLtName(tempLtName.trim());
+                            }
+                        }}
+                        placeholder="Digite seu nome..."
+                        className={`w-4/5 text-center px-4 py-3 rounded-lg border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' : 'bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400'} focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold uppercase tracking-wide`}
+                        autoFocus
+                    />
+                    <button
+                        onClick={() => {
+                            if (tempLtName.trim()) {
+                                setLtName(tempLtName.trim());
+                            }
+                        }}
+                        disabled={!tempLtName.trim()}
+                        className={`w-4/5 py-3 rounded-lg font-black uppercase tracking-widest transition-all ${!tempLtName.trim() ? 'opacity-50 cursor-not-allowed bg-slate-500 text-white' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 active:scale-95'}`}
+                    >
+                        Acessar Sistema
+                    </button>
+                </div>
+
+                <div className={`flex items-center justify-center gap-2 ${isDarkMode ? 'text-emerald-400' : 'text-[#004D24]'} font-bold uppercase tracking-widest text-[10px]`}>
+                     <div className="animate-bounce">
+                         <Table size={14} />
+                     </div>
+                     Aguardando Identificação...
+                </div>
+            </div>
+        </div>
+      )}
+
+      <AlertModal
+        isOpen={endOfDayAlert.isOpen}
+        title={endOfDayAlert.title}
+        message={endOfDayAlert.message}
+        onClose={() => setEndOfDayAlert(prev => ({ ...prev, isOpen: false }))}
+      />
+
+      <LayoutPreferencesModal
+        isOpen={layoutModalOpen}
+        onClose={() => setLayoutModalOpen(false)}
+        preferences={layoutPreferences}
+        onSave={handleSavePreferences}
+        currentUser={warName}
+        lockedColumnsFromDb={lockedColumns}
+        lockedTabsFromDb={lockedTabs}
+      />
+
+      <div className={`flex flex-1 w-full ${isDarkMode ? 'bg-slate-950 text-slate-200' : 'bg-slate-50 text-slate-800'} transition-colors duration-500 font-sans overflow-hidden relative`}>
+        <Sidebar 
+          activeView={view} 
+          onViewChange={handleViewChange} 
+          isDarkMode={isDarkMode} 
+          onSimulateEndOfDay={runEndOfDayRoutine}
+          visibleTabs={layoutPreferences.visibleTabs}
+        />
+
+        <main className="flex-1 flex flex-col overflow-hidden relative w-full">
+          <div id="subheader-portal-target" className="w-full shrink-0 z-[60] relative"></div>
+          {isSupabaseOffline && (
+            <div className="bg-amber-500 text-slate-900 px-4 py-2 flex items-center justify-between text-[11px] font-bold uppercase tracking-wider shrink-0 z-[50] border-b border-amber-600 shadow-sm animate-pulse">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-slate-900 animate-pulse shrink-0" />
+                <span>⚠️ MODO CONTINGÊNCIA ATIVO: CONEXÃO SUPABASE INSTÁVEL. OPERANDO COM CACHE SALVO.</span>
+              </div>
+              <button onClick={() => window.location.reload()} className="px-2.5 py-1 bg-slate-900 text-amber-400 rounded hover:bg-slate-800 text-[10px] font-black transition-all cursor-pointer">
+                TENTAR RECONECTAR
+              </button>
+            </div>
+          )}
+          <div className="flex-1 overflow-hidden relative">
+              <Suspense fallback={<div className="flex items-center justify-center h-full w-full"><Spinner size={48} text="Carregando módulo..." /></div>}>
+                {view === 'GRID_OPS' && (
+                  <GridOps 
+                    flights={globalFlights} 
+                    onUpdateFlights={handleManualFlightsUpdate} 
+                    vehicles={globalVehicles}
+                    operators={globalOperators}
+                    initialTab={gridOpsInitialTab}
+                    globalSearchTerm={globalSearchTerm}
+                    onUpdateSearch={setGlobalSearchTerm}
+                    meshFlights={meshFlights}
+                    setMeshFlights={setMeshFlights}
+                    onOpenShiftOperators={() => handleViewChange('SHIFT_OPERATORS')}
+                    positionRestrictions={positionRestrictions}
+                    positionsMetadata={positionsMetadata}
+                    onOpenReport={(flight) => {
+                        setTargetReportFlight(flight);
+                        handleViewChange('REPORTS');
+                    }}
+                    pendingAction={pendingAction}
+                    setPendingAction={setPendingAction}
+                    onEditingStateChange={setIsGridEditing}
+                    ltName={ltName}
+                    currentMeshDate={currentMeshDate}
+                    onDateChange={setCurrentMeshDate}
+                    layoutPreferences={layoutPreferences}
+                  />
+                )}
+                {view === 'SHIFT_OPERATORS' && (
+                  <ShiftOperatorsSection 
+                    onClose={() => handleViewChange('GRID_OPS')}
+                    operators={globalOperators}
+                    onUpdateOperators={setGlobalOperators}
+                    flights={globalFlights}
+                    onUpdateFlights={handleManualFlightsUpdate}
+                    vehicles={globalVehicles}
+                    onOpenCreateModal={() => {
+                        setPendingAction('CREATE');
+                        handleViewChange('GRID_OPS');
+                    }}
+                    onOpenImportModal={() => {
+                        setPendingAction('IMPORT');
+                        handleViewChange('GRID_OPS');
+                    }}
+                  />
+                )}
+                {view === 'OPERATIONAL_MESH' && (
+                  <OperationalMesh 
+                    onClose={() => handleViewChange('GRID_OPS')}
+                    isDarkMode={isDarkMode}
+                    meshFlights={meshFlights}
+                    setMeshFlights={setMeshFlights}
+                    currentMeshDate={currentMeshDate}
+                    setCurrentMeshDate={setCurrentMeshDate}
+                    setFlights={handleManualFlightsUpdate}
+                    globalFlights={globalFlights}
+                    onActivateMesh={(newFlights) => {
+                      handleManualFlightsUpdate(prev => {
+                        // SMART MERGE: Preservar dados operacionais de voos que já estão na tela
+                        const merged = newFlights.map(newF => {
+                          const existing = prev.find(p => 
+                            p.id === newF.id || 
+                            (p.flightNumber && p.flightNumber === newF.flightNumber && p.airline === newF.airline && p.date === newF.date)
+                          );
+
+                          // Se o voo já existe e TEM operador ou está em status avançado, preservamos o operacional
+                          if (existing && (existing.operator || existing.status !== 'CHEGADA')) {
+                            return {
+                              ...newF,
+                              ...existing, // O operacional "vivo" tem prioridade
+                              id: newF.id // Mantemos o ID da malha para consistência de referência
+                            };
+                          }
+                          return newF;
+                        });
+
+                        // Adicionar também voos que estão na tela mas NÃO estão na malha (inserções manuais)
+                        const manualFlights = prev.filter(p => 
+                          !newFlights.some(nf => nf.id === p.id || (nf.flightNumber && nf.flightNumber === p.flightNumber && nf.airline === p.airline))
+                        );
+
+                        const final = [...merged, ...manualFlights];
+                        // Remover duplicatas finais por ID
+                        return Array.from(new Map(final.map(f => [f.id, f])).values());
+                      });
+                      
+                      import('./services/supabaseService').then(({ bulkInsertFlights }) => {
+                        bulkInsertFlights(newFlights).catch(err => {
+                          console.error("Falha ao salvar na malha operacional:", err);
+                          alert(`Erro Crítico no Banco de Dados (Operacional):\n${err.message}\nVerifique se a tabela 'flights' possui todas as colunas necessárias.`);
+                        });
+                      });
+                    }}
+                    positionsMetadata={positionsMetadata}
+                    positionRestrictions={positionRestrictions}
+                  />
+                )}
+
+                {view === 'REPORTS' && (
+                  <ReportsView flights={globalFlights} initialFlight={targetReportFlight} />
+                )}
+                {view === 'FLEET' && (
+                  <OperatorManager
+                    density={sessionDensity}
+                    vehicles={globalVehicles}
+                    onUpdateVehicles={setGlobalVehicles}
+                    operators={globalOperators}
+                    flights={globalFlights}
+                  />
+                )}
+                {view === 'OPERATORS_ADMIN' && (
+                  <OperatorsAdmin 
+                    isDarkMode={isDarkMode} 
+                    globalOperators={globalOperators}
+                    onUpdateGlobalOperators={setGlobalOperators}
+                  />
+                )}
+                {view === 'FLEETS_ADMIN' && (
+                  <FleetsAdmin 
+                    isDarkMode={isDarkMode} 
+                    globalVehicles={globalVehicles}
+                    onUpdateGlobalVehicles={setGlobalVehicles}
+                    globalOperators={globalOperators}
+                   />
+                )}
+                {view === 'AIRCRAFTS_ADMIN' && (
+                  <AircraftsAdmin 
+                    isDarkMode={isDarkMode} 
+                   />
+                )}
+                {view === 'AIRLINES_ADMIN' && (
+                  <AirlinesAdmin 
+                    isDarkMode={isDarkMode} 
+                   />
+                )}
+
+                {view === 'AERODROMO' && (
+                  <Aerodromo 
+                    operators={globalOperators} 
+                    flights={globalFlights} 
+                    disabledPositions={disabledPositions}
+                    positionsMetadata={positionsMetadata}
+                    positionRestrictions={positionRestrictions}
+                    onRemoveFlight={async (flightId) => {
+                      if (!confirm("Deseja desvincular este voo da posição atual?")) return;
+                      // Update Local Otimista
+                      handleManualFlightsUpdate(prev => prev.map(f => f.id === flightId ? { ...f, positionId: '', pitId: undefined, positionType: undefined } : f));
+                      // Update Backend
+                      import('./services/supabaseService').then(({ clearFlightPosition }) => {
+                        clearFlightPosition(flightId).catch(err => {
+                           console.error("Falha ao desvincular voo:", err);
+                        });
+                      });
+                    }}
+                  />
+                )}
+                {view === 'AERODROMO_ADMIN' && (
+                  <AerodromoAdmin 
+                    disabledPositions={disabledPositions}
+                    setDisabledPositions={setDisabledPositions}
+                    positionsMetadata={positionsMetadata}
+                    setPositionsMetadata={setPositionsMetadata}
+                    patioPositions={patioPositions}
+                    setPatioPositions={setPatioPositions}
+                    positionRestrictions={positionRestrictions}
+                    setPositionRestrictions={setPositionRestrictions}
+                    flights={globalFlights}
+                    onClearAllAssignments={clearAllPositionAssignments}
+                  />
+                )}
+                {view === 'AI_DASHBOARD' && (
+                  <AiDashboard 
+                    flights={globalFlights}
+                    operators={globalOperators}
+                  />
+                )}
+                {view === 'FLIGHT_RADAR' && (
+                  <FlightRadarView />
+                )}
+              </Suspense>
+          </div>
+        </main>
+      </div>
+      {isPseudoFullscreen && (
+        <button 
+          onClick={() => setIsPseudoFullscreen(false)}
+          className="fixed bottom-4 right-4 bg-slate-800/80 hover:bg-slate-700 text-white p-2 rounded-full shadow-lg z-[10000] border border-slate-700 transition-all"
+          title="Sair do modo tela cheia"
+        >
+          <X size={20} />
+        </button>
+      )}
+    </div>
+  );
+};
+
+export default App;
