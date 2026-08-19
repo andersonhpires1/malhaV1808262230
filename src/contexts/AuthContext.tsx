@@ -11,6 +11,7 @@ interface AuthContextType {
   loginWithWarName: (name: string) => Promise<{ success: boolean; error?: string; step?: 'password' | 'first_login'; defaultEmail?: string }>;
   completeFirstLogin: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   loginWithPassword: (name: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  loginAsGuest: (name: string) => Promise<{ success: boolean; error?: string }>;
   isUsuario: boolean;
   isAdministrador: boolean;
   isMaster: boolean;
@@ -25,6 +26,7 @@ const AuthContext = createContext<AuthContextType>({
   loginWithWarName: async () => ({ success: false }),
   completeFirstLogin: async () => ({ success: false }),
   loginWithPassword: async () => ({ success: false }),
+  loginAsGuest: async () => ({ success: false, error: 'Não implementado' }),
   isUsuario: false,
   isAdministrador: false,
   isMaster: false,
@@ -307,6 +309,104 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginAsGuest = async (name: string) => {
+    try {
+      const cleanName = name.trim().toUpperCase();
+      if (!cleanName) {
+        return { success: false, error: 'O nome do convidado não pode ser vazio.' };
+      }
+
+      // 1. Tenta buscar se o operador já existe na tabela `operadores_geral` pelo war_name
+      let { data: existingOperator, error: fetchError } = await supabase
+        .from('operadores_geral')
+        .select('*')
+        .ilike('war_name', cleanName)
+        .maybeSingle();
+
+      let operatorData = existingOperator;
+
+      if (!operatorData) {
+        // 2. Se não existir, insere como um novo operador convidado
+        const newGuestPayload = {
+          full_name: cleanName,
+          war_name: cleanName,
+          role: 'Convidado',
+          status: 'DISPONÍVEL',
+          category: 'AERODROMO',
+          fleet_capability: 'BOTH',
+          is_lt: 'NÃO',
+          is_usuario: true,
+          is_administrador: false,
+          is_master: false,
+          email: `${cleanName.toLowerCase().replace(/\s+/g, '')}@convidado.com`
+        };
+
+        const { data: insertedData, error: insertError } = await supabase
+          .from('operadores_geral')
+          .insert([newGuestPayload])
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error("Erro ao registrar convidado no banco de dados:", insertError);
+          // Caso ocorra erro de coluna ausente (por exemplo, se is_usuario ainda não foi criada no banco)
+          // fazemos um fallback tentando salvar sem as colunas booleanas
+          const fallbackPayload = {
+            full_name: cleanName,
+            war_name: cleanName,
+            role: 'Convidado',
+            status: 'DISPONÍVEL',
+            category: 'AERODROMO',
+            fleet_capability: 'BOTH',
+            is_lt: 'NÃO',
+            email: `${cleanName.toLowerCase().replace(/\s+/g, '')}@convidado.com`
+          };
+          const { data: retryData, error: retryError } = await supabase
+            .from('operadores_geral')
+            .insert([fallbackPayload])
+            .select()
+            .single();
+
+          if (retryError) {
+            throw new Error(`Falha ao registrar convidado no banco: ${retryError.message}`);
+          }
+          operatorData = retryData;
+        } else {
+          operatorData = insertedData;
+        }
+      }
+
+      // 3. Monta o usuário virtual com as permissões corretas
+      const hasUsuarioCol = operatorData && 'is_usuario' in operatorData;
+      const dbIsUsuario = hasUsuarioCol ? !!operatorData.is_usuario : true; // Convidados sempre têm acesso de usuário
+      const dbIsAdmin = operatorData ? !!operatorData.is_administrador : false;
+      const dbIsMaster = operatorData ? !!operatorData.is_master : false;
+
+      const virtualUser = buildVirtualUser(operatorData, dbIsUsuario, dbIsAdmin, dbIsMaster);
+      setUser(virtualUser);
+      setSession({ user: virtualUser });
+      localStorage.setItem('virtual_user', JSON.stringify(virtualUser));
+
+      // Registrar log de auditoria na caixa preta
+      try {
+        await supabase.from('caixa_preta').insert([{
+          entity_type: 'OPERATOR',
+          entity_id: operatorData.id,
+          action_type: 'GUEST_LOGIN',
+          user_name: cleanName,
+          user_role: 'Convidado',
+          metadata: { message: `Convidado '${cleanName}' acessou o sistema.` }
+        }]);
+      } catch (logErr) {
+        console.warn("Erro ao registrar log de convidado na caixa_preta:", logErr);
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Erro ao validar acesso de convidado.' };
+    }
+  };
+
   const signOut = async () => {
     localStorage.removeItem('virtual_user');
     await supabase.auth.signOut();
@@ -328,6 +428,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       loginWithWarName, 
       completeFirstLogin, 
       loginWithPassword, 
+      loginAsGuest,
       isUsuario, 
       isAdministrador, 
       isMaster 

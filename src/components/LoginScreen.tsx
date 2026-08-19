@@ -3,13 +3,14 @@ import { PlaneTakeoff, Loader2, ShieldCheck, ArrowLeft, Mail, Lock, UserCheck } 
 import { useAuth } from '../contexts/AuthContext';
 
 export const LoginScreen: React.FC = () => {
-  const { loginWithWarName, loginWithPassword, completeFirstLogin } = useAuth();
-  const [loginStep, setLoginStep] = useState<'warName' | 'password' | 'first_login'>('warName');
+  const { loginWithWarName, loginWithPassword, completeFirstLogin, loginAsGuest } = useAuth();
+  const [loginStep, setLoginStep] = useState<'warName' | 'password' | 'first_login' | 'guestName'>('warName');
   
   const [warName, setWarName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [guestName, setGuestName] = useState('');
   
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -93,10 +94,28 @@ export const LoginScreen: React.FC = () => {
     }
   };
 
+  const handleGuestSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!guestName.trim()) {
+      setError('Por favor, digite seu nome completo para identificação.');
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    const result = await loginAsGuest(guestName.trim());
+    if (!result.success) {
+      setError(result.error || 'Erro ao entrar como convidado.');
+      setLoading(false);
+    }
+  };
+
   const handleGoBack = () => {
     setLoginStep('warName');
     setPassword('');
     setConfirmPassword('');
+    setGuestName('');
     setError(null);
   };
 
@@ -167,6 +186,25 @@ export const LoginScreen: React.FC = () => {
           </div>
         )}
 
+        {loginStep === 'guestName' && (
+          <div className="flex flex-col items-center mb-6 relative z-10 animate-fade-in">
+            <button 
+              onClick={handleGoBack}
+              className="absolute left-0 top-1 text-slate-500 hover:text-white transition-colors flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider"
+              title="Voltar"
+            >
+              <ArrowLeft size={14} /> Voltar
+            </button>
+            <div className="w-12 h-12 bg-blue-600/10 border border-blue-500/20 rounded-xl flex items-center justify-center mb-3">
+              <PlaneTakeoff size={20} className="text-blue-400 animate-pulse" />
+            </div>
+            <h2 className="text-xl font-bold text-white tracking-tight uppercase">Convidado</h2>
+            <p className="text-slate-400 text-[11px] text-center mt-3 font-medium px-2 leading-relaxed">
+              Digite seu nome completo de identificação para acessar as funcionalidades táticas do sistema MALHA.
+            </p>
+          </div>
+        )}
+
         {error && (
           <div className="bg-red-500/10 border border-red-500/20 text-red-500 text-xs p-4 rounded-xl mb-6 font-bold text-center leading-relaxed relative z-10 animate-fade-in">
             {error}
@@ -197,6 +235,23 @@ export const LoginScreen: React.FC = () => {
               className="w-full bg-white hover:bg-blue-50 text-slate-950 font-black uppercase tracking-[0.15em] text-xs py-4 rounded-xl transition-all mt-4 flex justify-center items-center disabled:opacity-50 shadow-lg shadow-white/5 active:scale-[0.98] cursor-pointer"
             >
               {loading ? <Loader2 size={18} className="animate-spin text-blue-600" /> : 'Validar Credenciais'}
+            </button>
+
+            <div className="relative flex py-2 items-center">
+              <div className="flex-grow border-t border-slate-800/40"></div>
+              <span className="flex-shrink mx-4 text-slate-600 text-[10px] font-black uppercase tracking-widest">ou</span>
+              <div className="flex-grow border-t border-slate-800/40"></div>
+            </div>
+
+            <button 
+              type="button"
+              onClick={() => {
+                setLoginStep('guestName');
+                setError(null);
+              }}
+              className="w-full bg-slate-900/60 hover:bg-slate-800/80 text-slate-300 font-black uppercase tracking-[0.15em] text-xs py-3.5 rounded-xl border border-slate-800/80 hover:border-slate-700 transition-all flex justify-center items-center gap-2 shadow-md active:scale-[0.98] cursor-pointer"
+            >
+              Convidado
             </button>
           </form>
         )}
@@ -284,6 +339,34 @@ export const LoginScreen: React.FC = () => {
               className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black uppercase tracking-[0.12em] text-[11px] py-4 rounded-xl transition-all mt-4 flex justify-center items-center disabled:opacity-50 shadow-lg shadow-amber-500/10 active:scale-[0.98] cursor-pointer"
             >
               {loading ? <Loader2 size={18} className="animate-spin text-slate-950" /> : 'Cadastrar Senha e Entrar'}
+            </button>
+          </form>
+        )}
+
+        {/* STEP 3: GUEST NAME INPUT */}
+        {loginStep === 'guestName' && (
+          <form onSubmit={handleGuestSubmit} className="space-y-5 relative z-10 animate-fade-in">
+            <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Seu Nome Completo</label>
+              <div className="relative">
+                <input 
+                  type="text" 
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  required
+                  placeholder="EX: ANDERSON PIRES"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-5 py-4 text-white placeholder-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all uppercase font-black tracking-widest text-sm"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <button 
+              type="submit" 
+              disabled={loading}
+              className="w-full bg-white hover:bg-blue-50 text-slate-950 font-black uppercase tracking-[0.15em] text-xs py-4 rounded-xl transition-all mt-2 flex justify-center items-center disabled:opacity-50 shadow-lg shadow-white/5 active:scale-[0.98] cursor-pointer"
+            >
+              {loading ? <Loader2 size={18} className="animate-spin text-blue-600" /> : 'Entrar como Convidado'}
             </button>
           </form>
         )}
