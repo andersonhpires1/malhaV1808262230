@@ -466,29 +466,6 @@ export const FleetsAdmin: React.FC<FleetsAdminProps> = ({ isDarkMode, globalVehi
       </div>
 
       <div className="flex items-center gap-4 h-full">
-        <div className="flex items-center gap-2">
-          <select 
-            className="bg-black/20 hover:bg-black/40 border border-white/10 rounded-md text-[9px] text-white font-bold uppercase h-7 px-2 outline-none cursor-pointer"
-            value={filterType}
-            onChange={e => setFilterType(e.target.value)}
-          >
-            <option value="TODOS" className="text-slate-900 bg-white">TIPO: TODOS</option>
-            <option value="SERVIDOR" className="text-slate-900 bg-white">SERVIDOR</option>
-            <option value="CTA" className="text-slate-900 bg-white">CTA</option>
-          </select>
-
-          <select 
-            className="bg-black/20 hover:bg-black/40 border border-white/10 rounded-md text-[9px] text-white font-bold uppercase h-7 px-2 outline-none cursor-pointer"
-            value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value)}
-          >
-            <option value="TODOS" className="text-slate-900 bg-white">STATUS: TODOS</option>
-            <option value="DISPONÍVEL" className="text-slate-900 bg-white">DISPONÍVEL</option>
-            <option value="OCUPADO" className="text-slate-900 bg-white">OCUPADO</option>
-            <option value="INATIVO" className="text-slate-900 bg-white">INATIVO</option>
-          </select>
-        </div>
-
         <div className="relative group">
           <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
             <Search size={13} className={`${isDarkMode ? 'text-white/40 group-focus-within:text-white' : 'text-slate-400 group-focus-within:text-[#3CA317]'} transition-colors`} />

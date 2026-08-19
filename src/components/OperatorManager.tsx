@@ -274,13 +274,13 @@ export const OperatorManager: React.FC<OperatorManagerProps> = ({ density, vehic
         vehicles={syncedVehicles}
         flights={flights}
       />
-      <header className="px-8 py-3 border-b border-slate-800/60 bg-slate-900/40 shrink-0">
-        <div className="flex items-center justify-between gap-6">
+      <header className="h-16 shrink-0 flex items-center px-6 md:px-8 border-b border-slate-800/60 bg-slate-900/40 z-20">
+        <div className="flex items-center justify-between gap-6 w-full">
           <div className="flex items-center gap-6">
-            <h2 className="text-xl font-black text-white uppercase tracking-tighter flex items-center gap-2"><Truck className="text-amber-500" size={24} /> MONITOR FROTAS</h2>
+            <h2 className="text-sm font-black text-white uppercase tracking-tighter flex items-center gap-2"><Truck className="text-amber-500" size={20} /> MONITOR FROTAS</h2>
             <div className="flex items-center gap-1 bg-slate-950/50 p-1 rounded-md border border-slate-800/50">
-              <button onClick={() => setActiveTab('SERVIDOR')} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'SERVIDOR' ? 'bg-white text-slate-950 font-black' : 'text-slate-500 hover:text-slate-300'}`}>SRV's</button>
-              <button onClick={() => setActiveTab('CTA')} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'CTA' ? 'bg-amber-500 text-slate-950 font-black' : 'text-slate-500 hover:text-slate-300'}`}>CTAs</button>
+              <button onClick={() => setActiveTab('SERVIDOR')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'SERVIDOR' ? 'bg-white text-slate-950 font-black' : 'text-slate-500 hover:text-slate-300'}`}>SRV's</button>
+              <button onClick={() => setActiveTab('CTA')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'CTA' ? 'bg-amber-500 text-slate-950 font-black' : 'text-slate-500 hover:text-slate-300'}`}>CTAs</button>
             </div>
 
             <div className="w-px h-6 bg-slate-800/60"></div>

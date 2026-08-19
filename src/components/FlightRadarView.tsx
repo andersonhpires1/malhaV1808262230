@@ -4,6 +4,7 @@ import {
   AlertTriangle, SlidersHorizontal, Link2
 } from 'lucide-react';
 import { getNormalizedAirlineInfo } from './AirlineLogo';
+import { FlightRadarFlightCard } from './FlightRadarFlightCard';
 
 interface FlightPosition {
   flight_id: string;
@@ -173,6 +174,10 @@ export const FlightRadarView: React.FC = () => {
 
   const filteredFlights = useMemo(() => {
     return flights.filter(f => {
+      // EXCLUSIVIDADE DE POUSOS (SÓ MOSTRA CHEGADAS EM SBGR / GRU)
+      const isArrival = f.destination === 'SBGR' || f.destination === 'GRU';
+      if (!isArrival) return false;
+
       const matchSearch = 
         f.flight.toLowerCase().includes(searchTerm.toLowerCase()) ||
         f.registration.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -180,13 +185,10 @@ export const FlightRadarView: React.FC = () => {
         f.aircraft_type.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchAirline = selectedAirline === 'ALL' || f.airline.toUpperCase() === selectedAirline;
-      const matchStatus = selectedStatus === 'ALL' || 
-        (selectedStatus === 'ARRIVING' && f.destination === 'SBGR') ||
-        (selectedStatus === 'DEPARTING' && f.origin === 'SBGR');
 
-      return matchSearch && matchAirline && matchStatus;
+      return matchSearch && matchAirline;
     });
-  }, [flights, searchTerm, selectedAirline, selectedStatus]);
+  }, [flights, searchTerm, selectedAirline]);
 
   // Carregamento dinâmico e seguro do Leaflet
   useEffect(() => {
@@ -336,25 +338,25 @@ export const FlightRadarView: React.FC = () => {
   }, [leafletLoaded]);
 
   return (
-    <div className="flex flex-col xl:flex-row gap-4 p-3 w-full xl:h-[calc(100vh-100px)] xl:min-h-[550px] xl:max-h-[750px] xl:overflow-hidden text-slate-100 bg-slate-950 font-sans">
+    <div className="flex flex-col lg:flex-row gap-4 p-3 w-full h-[calc(100vh-120px)] min-h-0 overflow-hidden text-slate-100 bg-slate-950 font-sans">
       
       {/* SEÇÃO ESQUERDA: MAPA PRINCIPAL (DIRETO SEM DIVS ANINHADAS) */}
-      <div className="flex-1 shrink-0 bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl relative overflow-hidden min-h-[480px] xl:h-full">
+      <div className="flex-1 shrink-0 bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl relative overflow-hidden min-h-[300px] h-full">
         {!leafletLoaded ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-950/80 z-20">
             <div className="w-8 h-8 rounded-full border-2 border-emerald-500/20 border-t-emerald-400 animate-spin"></div>
             <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest animate-pulse">Carregando bases cartográficas...</span>
           </div>
         ) : null}
-        <div id="leaflet-map-element" className="w-full h-full min-h-[480px]" style={{ height: '100%', width: '100%' }} />
+        <div id="leaflet-map-element" className="w-full h-full min-h-[300px]" style={{ height: '100%', width: '100%' }} />
         
         <div className="absolute bottom-3 right-3 z-[1000] bg-slate-950/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-800/80 text-[10px] font-mono text-slate-400 shadow-lg">
           SBGR CTR • -23.4356° | -46.4731°
         </div>
       </div>
 
-      {/* SEÇÃO DIREITA: LISTAGEM E PAINEL OPERACIONAL */}
-      <div className="w-full xl:w-[380px] shrink-0 flex flex-col gap-3 xl:h-full min-h-0 overflow-hidden">
+      {/* SEÇÃO DIREITA: LISTAGEM E PAINEL OPERACIONAL (RESPONSIVIDADE INTELIGENTE COM ALTURA LIMITADA EM VIEWS COMPACTAS E SCROLLBAR OPERACIONAL) */}
+      <div className="w-full lg:w-[380px] shrink-0 flex flex-col gap-3 h-[420px] max-h-[420px] lg:h-full lg:max-h-full overflow-y-auto pr-3 scrollbar-thin scrollbar-thumb-slate-700">
         
         {/* FILTROS E PESQUISA */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl shrink-0">
@@ -393,15 +395,9 @@ export const FlightRadarView: React.FC = () => {
 
               <div className="flex flex-col gap-0.5">
                 <label className="text-[8px] font-black uppercase tracking-wider text-slate-500">Fluxo Operacional</label>
-                <select 
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="w-full p-1.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-lg text-xs focus:outline-none font-bold"
-                >
-                  <option value="ALL">TODOS (MISTO)</option>
-                  <option value="ARRIVING">CHEGADAS (POUSOS)</option>
-                  <option value="DEPARTING">SAÍDAS (DECOLAGENS)</option>
-                </select>
+                <div className="w-full p-1.5 bg-emerald-950/20 border border-emerald-500/20 text-emerald-400 rounded-lg text-xs font-black uppercase tracking-widest text-center">
+                  Somente Pousos
+                </div>
               </div>
             </div>
 
@@ -436,155 +432,24 @@ export const FlightRadarView: React.FC = () => {
           </div>
         </div>
 
-        {/* LISTAGEM DE ALVOS */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex-1 flex flex-col min-h-0 min-h-[160px]">
-          <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2.5 shrink-0">
-            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-              <Activity size={13} className="text-emerald-500 animate-pulse" />
-              <span>Aeronaves no Radar ({filteredFlights.length})</span>
-            </h3>
-            <span className="text-[9px] font-mono font-bold text-slate-500 uppercase">Setor CTR GRU</span>
-          </div>
-
-          {loading && flights.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center py-6 gap-2 shrink-0">
-              <RefreshCw size={20} className="text-emerald-500 animate-spin" />
-              <p className="text-[10px] text-slate-500 block font-bold font-mono">Buscando telemetria live...</p>
+        {/* CONTEÚDO PRINCIPAL: DETALHES DE TELEMETRIA OU AVISO DE SELEÇÃO */}
+        {selectedFlight ? (
+          <FlightRadarFlightCard 
+            flight={selectedFlight}
+            onClose={() => setSelectedFlight(null)}
+            onIntegrate={(f) => {
+              console.log("Integrado ao SSoT calços:", f);
+            }}
+          />
+        ) : (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center flex-1 flex flex-col items-center justify-center gap-3 min-h-[240px] animate-fade-in shadow-xl">
+            <Compass size={32} className="text-slate-600 animate-pulse animate-duration-1000" />
+            <div>
+              <p className="text-xs font-black text-slate-300 uppercase tracking-widest">Nenhuma Aeronave Selecionada</p>
+              <p className="text-[10px] text-slate-500 mt-1.5 max-w-[220px] mx-auto leading-normal">
+                Clique em qualquer aeronave no mapa radar ou utilize a pesquisa para exibir a telemetria do voo ao vivo.
+              </p>
             </div>
-          ) : filteredFlights.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center py-6 gap-2 text-center shrink-0">
-              <AlertTriangle size={20} className="text-amber-500/60 animate-bounce" />
-              <div>
-                <p className="text-[10px] text-slate-300 block font-bold">Nenhum alvo no setor</p>
-                <p className="text-[9px] text-slate-500 mt-1 max-w-[220px] mx-auto leading-normal">
-                  Sem voos ativos de <strong className="text-amber-400">"{selectedAirline}"</strong> no momento.
-                </p>
-                <button 
-                  onClick={() => {
-                    setSelectedAirline('ALL');
-                    setSelectedStatus('ALL');
-                    setSearchTerm('');
-                  }}
-                  className="px-2.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 text-[8.5px] font-bold uppercase tracking-widest rounded-lg transition-all mt-2 active:scale-95"
-                >
-                  RESETAR FILTROS
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 min-h-0 overflow-y-auto pr-1 flex flex-col gap-1.5 font-mono">
-              {filteredFlights.map((f) => {
-                const isSelected = selectedFlight?.flight_id === f.flight_id;
-                const distance = getDistanceNM(f.lat, f.lon);
-                const carrierInfo = getNormalizedAirlineInfo(f.flight);
-                const isArriving = f.destination === 'SBGR';
-
-                return (
-                  <div 
-                    key={f.flight_id || f.flight}
-                    onClick={() => setSelectedFlight(f)}
-                    className={`p-2.5 rounded-lg border transition-all cursor-pointer flex items-center justify-between shrink-0 font-sans ${
-                      isSelected 
-                        ? 'bg-emerald-500/10 border-emerald-500/50 shadow-md shadow-emerald-500/5' 
-                        : 'bg-slate-950/65 border-slate-800 hover:bg-slate-950/90'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className={`h-7 w-7 rounded-md shrink-0 flex items-center justify-center font-mono font-black text-[10px] ${
-                        carrierInfo.name === 'LATAM' 
-                          ? 'bg-purple-600/15 text-purple-400 border border-purple-500/30' 
-                          : carrierInfo.name === 'GOL'
-                            ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
-                            : carrierInfo.name === 'AZUL'
-                              ? 'bg-blue-600/15 text-blue-400 border border-blue-500/30'
-                              : 'bg-slate-800 text-slate-300'
-                      }`}>
-                        {carrierInfo.name === 'LATAM' ? 'LA' : carrierInfo.name === 'GOL' ? 'G3' : carrierInfo.name === 'AZUL' ? 'AD' : f.airline.substring(0,2)}
-                      </div>
-
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-1">
-                          <span className="text-[11px] font-black tracking-tight text-white">{f.flight}</span>
-                          <span className={`text-[7px] font-bold px-1 rounded ${
-                            isArriving ? 'bg-emerald-500/10 text-emerald-400' : 'bg-cyan-500/10 text-cyan-400'
-                          }`}>
-                            {isArriving ? 'CHEGADA' : 'DECOLAG.'}
-                          </span>
-                        </div>
-                        <div className="text-[9px] text-slate-500 flex items-center gap-1.5 font-mono">
-                          <span>{f.aircraft_type}</span>
-                          <span className="text-slate-800">•</span>
-                          <span>{f.registration}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-right flex flex-col font-mono shrink-0">
-                      <span className="text-slate-100 text-[10px] font-bold leading-tight">{f.alt >= 10000 ? `FL${Math.round(f.alt / 100)}` : `${f.alt.toLocaleString()} ft`}</span>
-                      <span className="text-slate-500 text-[9px] leading-tight block mt-0.5">{distance} NM de GRU</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* HUD DE ANÁLISE DO ALVO SELECIONADO */}
-        {selectedFlight && (
-          <div className="bg-slate-900 border border-emerald-500/20 rounded-2xl p-4 shadow-2xl relative overflow-hidden shrink-0 animate-fade-in">
-            <div className="absolute top-0 left-0 bottom-0 w-1 bg-emerald-500"></div>
-
-            <div className="flex items-center justify-between mb-3 shrink-0">
-              <div className="flex items-center gap-1.5">
-                <Compass size={13} className="text-emerald-400 animate-spin" />
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-400">TELEMETRIA DO ALVO</h4>
-              </div>
-              <button 
-                onClick={() => setSelectedFlight(null)}
-                className="text-[9px] text-slate-500 hover:text-white font-mono font-bold hover:underline"
-              >
-                [FECHAR]
-              </button>
-            </div>
-
-            <div className="flex justify-between items-start border-b border-slate-800 pb-2.5 mb-2.5 shrink-0">
-              <div>
-                <span className="text-xl font-black text-white block tracking-tighter leading-none">{selectedFlight.flight}</span>
-                <span className="text-[8.5px] font-mono text-slate-500 uppercase mt-1 block">CALLSIGN: {selectedFlight.callsign} | REG: {selectedFlight.registration}</span>
-              </div>
-              <div className="text-right shrink-0">
-                <span className="text-[9px] font-black text-emerald-400 uppercase tracking-wider block bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">{selectedFlight.status}</span>
-                <span className="text-[8.5px] text-slate-500 font-mono mt-1 block">{selectedFlight.origin} ➔ {selectedFlight.destination}</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 mb-3 shrink-0">
-              <div className="bg-slate-950 p-2 rounded-lg border border-slate-800 flex flex-col font-mono text-center">
-                <span className="text-[7.5px] text-slate-400 uppercase block mb-0.5">Altitude</span>
-                <span className="text-[11px] font-black text-white block">{selectedFlight.alt >= 10000 ? `FL${Math.round(selectedFlight.alt / 100)}` : `${selectedFlight.alt.toLocaleString()} ft`}</span>
-              </div>
-
-              <div className="bg-slate-950 p-2 rounded-lg border border-slate-800 flex flex-col font-mono text-center">
-                <span className="text-[7.5px] text-slate-400 uppercase block mb-0.5">VELOCIDADE</span>
-                <span className="text-[11px] font-black text-white block">{selectedFlight.speed} KT</span>
-              </div>
-
-              <div className="bg-slate-950 p-2 rounded-lg border border-slate-800 flex flex-col font-mono text-center">
-                <span className="text-[7.5px] text-slate-400 uppercase block mb-0.5">RUMO/PROA</span>
-                <span className="text-[11px] font-black text-white block">{selectedFlight.track || 0}°</span>
-              </div>
-            </div>
-
-            <button 
-              onClick={() => {
-                alert(`Vinculação efetuada com sucesso!\nO voo ${selectedFlight.flight} foi pré-fixado no SSoT.`);
-              }}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl text-[10px] font-black transition-colors shadow-lg shrink-0"
-            >
-              <Link2 size={12} strokeWidth={2.5} />
-              <span>INTEGRAR À FILA DE CALÇOS</span>
-            </button>
           </div>
         )}
 

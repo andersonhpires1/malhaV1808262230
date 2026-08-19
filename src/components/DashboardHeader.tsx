@@ -66,33 +66,33 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ isDarkMode, to
 
   return (
     <>
-      <header className={`h-20 ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-[#004D24] border-transparent'} border-b flex items-center justify-between px-8 z-[100] relative transition-colors duration-500`}>
+      <header className={`h-16 ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-[#004D24] border-transparent'} border-b flex items-center justify-between px-6 md:px-8 z-[100] relative transition-colors duration-500`}>
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3">
-            <div className="bg-white/20 p-2 rounded-lg shadow-[0_0_20px_rgba(255,255,255,0.2)]">
-              <Plane className="text-white" size={20} />
+            <div className="bg-white/20 p-1.5 rounded-lg shadow-[0_0_20px_rgba(255,255,255,0.2)]">
+              <Plane className="text-white" size={18} />
             </div>
           </div>
 
-          <div className="w-px h-10 bg-white/20"></div>
+          <div className="w-px h-8 bg-white/20"></div>
 
           <div className="relative" ref={avatarMenuRef}>
             <div className="flex items-center gap-3 group cursor-pointer" onClick={() => setIsAvatarMenuOpen(!isAvatarMenuOpen)}>
-                <div className="w-11 h-11 rounded-lg bg-white/10 border-2 border-white/20 flex items-center justify-center group-hover:border-white/40 transition-colors overflow-hidden">
+                <div className="w-9 h-9 rounded-lg bg-white/10 border-2 border-white/20 flex items-center justify-center group-hover:border-white/40 transition-colors overflow-hidden">
                     {ltPhotoUrl ? (
                         <img src={ltPhotoUrl} alt={ltName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
-                        <User size={18} className="text-white" />
+                        <User size={16} className="text-white" />
                     )}
                 </div>
                 <div className="text-left flex items-center gap-2">
                   <div>
-                    <span className="text-sm font-bold transition-colors uppercase block select-none text-white group-hover:text-emerald-200">
+                    <span className="text-xs font-bold transition-colors uppercase block select-none text-white group-hover:text-emerald-200 leading-tight">
                         {ltName || 'SELECIONE O LÍDER'}
                     </span>
-                    <span className="text-[10px] text-emerald-200 font-black tracking-widest uppercase block">Líder de Turno</span>
+                    <span className="text-[9px] text-emerald-200 font-black tracking-widest uppercase block leading-none mt-0.5">Líder de Turno</span>
                   </div>
-                  <ChevronDown className="text-white/60 group-hover:text-white transition-colors" size={16} />
+                  <ChevronDown className="text-white/60 group-hover:text-white transition-colors" size={14} />
                 </div>
             </div>
 
@@ -209,19 +209,19 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ isDarkMode, to
               </div>
           , document.body)}
 
-          <div className="w-px h-10 bg-white/20"></div>
+          <div className="w-px h-8 bg-white/20"></div>
 
-          <div>
-              <h1 className="text-4xl font-bold tracking-tighter font-mono text-white">{formatTime(currentTime)}</h1>
-              <p className="text-xs text-emerald-100 font-bold tracking-widest">{formatDate(currentTime)}</p>
+          <div className="flex flex-col justify-center">
+              <h1 className="text-2xl font-bold tracking-tighter font-mono text-white leading-none">{formatTime(currentTime)}</h1>
+              <p className="text-[10px] text-emerald-100 font-bold tracking-widest leading-none mt-1">{formatDate(currentTime)}</p>
           </div>
 
-          <div className="w-px h-10 bg-white/20"></div>
+          <div className="w-px h-8 bg-white/20"></div>
 
           <div className="flex items-center gap-6">
-              <div className="text-sm">
+              <div className="text-xs">
                   <div className="flex items-center gap-2">
-                      <span className="text-white font-bold text-xs uppercase w-10">DENS.</span>
+                      <span className="text-white font-bold text-[10px] uppercase w-9">DENS.</span>
                       {editingField === 'density' ? (
                           <input 
                               type="text"
@@ -246,19 +246,19 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ isDarkMode, to
                                   }
                               }}
                               autoFocus
-                              className={`w-16 font-mono font-bold text-lg rounded px-1 outline-none ${isDarkMode ? 'bg-white/10 text-white' : 'bg-white text-slate-900 border border-emerald-500/50'}`}
+                              className={`w-14 font-mono font-bold text-sm rounded px-1 outline-none ${isDarkMode ? 'bg-white/10 text-white' : 'bg-white text-slate-900 border border-emerald-500/50'}`}
                           />
                       ) : (
                           <span 
-                              className="font-mono font-bold text-white text-lg cursor-pointer hover:text-emerald-200 transition-colors w-16 inline-block"
+                              className="font-mono font-bold text-white text-sm cursor-pointer hover:text-emerald-200 transition-colors w-14 inline-block"
                               onClick={() => setEditingField('density')}
                           >
                               {density.toFixed(3)}
                           </span>
                       )}
                   </div>
-                  <div className="flex items-center gap-2 mt-1">
-                      <span className="text-white font-bold text-xs uppercase w-10">TEMP.</span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-white font-bold text-[10px] uppercase w-9">TEMP.</span>
                       {editingField === 'temperature' ? (
                           <input 
                               type="text"
@@ -283,11 +283,11 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ isDarkMode, to
                                   }
                               }}
                               autoFocus
-                              className={`w-16 font-mono font-bold text-lg rounded px-1 outline-none ${isDarkMode ? 'bg-white/10 text-white' : 'bg-white text-slate-900 border border-emerald-500/50'}`}
+                              className={`w-14 font-mono font-bold text-sm rounded px-1 outline-none ${isDarkMode ? 'bg-white/10 text-white' : 'bg-white text-slate-900 border border-emerald-500/50'}`}
                           />
                       ) : (
                           <span 
-                              className="font-mono font-bold text-white text-lg cursor-pointer hover:text-emerald-200 transition-colors w-16 inline-block"
+                              className="font-mono font-bold text-white text-sm cursor-pointer hover:text-emerald-200 transition-colors w-14 inline-block"
                               onClick={() => setEditingField('temperature')}
                           >
                               {temperature.toFixed(1)}°C

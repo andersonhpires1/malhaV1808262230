@@ -213,9 +213,9 @@ export const ShiftOperatorsSection: React.FC<ShiftOperatorsSectionProps> = ({
 
   const headers = (
     <div className="w-full shrink-0 flex flex-col font-sans">
-        {/* Line 2: TOP HUD NAV - FULLWIDTH */}
-        <div className={`h-16 border-b flex items-center justify-between px-8 z-30 ${isDarkMode ? 'border-slate-800 bg-slate-900' : 'bg-[#3CA317] border-[#29824a] text-white shadow-sm'}`}>
-            <div className="flex items-center gap-6">
+        {/* TOP HUD NAV - FULLWIDTH */}
+        <div className={`h-16 border-b flex items-center justify-between px-6 z-30 ${isDarkMode ? 'border-slate-800 bg-slate-900' : 'bg-[#3CA317] border-[#29824a] text-white shadow-sm'}`}>
+            <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                     <button
                         onClick={onClose}
@@ -238,6 +238,42 @@ export const ShiftOperatorsSection: React.FC<ShiftOperatorsSectionProps> = ({
                         {viewMode === 'CARDS' ? 'Ver Tabela' : 'Ver Cards'}
                     </button>
                 </div>
+
+                {/* STATUS CARDS COMPACTOS NO CABEÇALHO */}
+                <div className="flex items-center gap-2">
+                    {/* Disponíveis */}
+                    <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border transition-all ${
+                        isDarkMode ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-white/15 border-white/20 text-white'
+                    }`}>
+                        <Users size={13} className={isDarkMode ? 'text-emerald-400 opacity-80' : 'text-white opacity-80'} />
+                        <div className="flex items-baseline gap-1.5">
+                            <span className={`text-[8px] font-black uppercase tracking-wider ${isDarkMode ? 'text-emerald-400/80' : 'text-emerald-100'}`}>Disponíveis</span>
+                            <span className={`text-xs font-black font-mono leading-none ${isDarkMode ? 'text-emerald-400' : 'text-white'}`}>{teamStats.disponivel}</span>
+                        </div>
+                    </div>
+
+                    {/* Ocupados */}
+                    <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border transition-all ${
+                        isDarkMode ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-white/15 border-white/20 text-white'
+                    }`}>
+                        <Droplet size={13} className={isDarkMode ? 'text-amber-400 opacity-80' : 'text-white opacity-80'} />
+                        <div className="flex items-baseline gap-1.5">
+                            <span className={`text-[8px] font-black uppercase tracking-wider ${isDarkMode ? 'text-amber-400/80' : 'text-amber-100'}`}>Ocupados</span>
+                            <span className={`text-xs font-black font-mono leading-none ${isDarkMode ? 'text-amber-400' : 'text-white'}`}>{teamStats.enchendo + teamStats.designado}</span>
+                        </div>
+                    </div>
+
+                    {/* Designados */}
+                    <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border transition-all ${
+                        isDarkMode ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' : 'bg-white/15 border-white/20 text-white'
+                    }`}>
+                        <BusFront size={13} className={isDarkMode ? 'text-blue-400 opacity-80' : 'text-white opacity-80'} />
+                        <div className="flex items-baseline gap-1.5">
+                            <span className={`text-[8px] font-black uppercase tracking-wider ${isDarkMode ? 'text-blue-400/80' : 'text-blue-100'}`}>Designados</span>
+                            <span className={`text-xs font-black font-mono leading-none ${isDarkMode ? 'text-blue-400' : 'text-white'}`}>{teamStats.designado}</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div className="flex items-center gap-4">
@@ -248,7 +284,7 @@ export const ShiftOperatorsSection: React.FC<ShiftOperatorsSectionProps> = ({
                     <input 
                         type="text" 
                         placeholder="PESQUISAR..." 
-                        className={`border rounded text-[10px] uppercase w-56 pl-8 pr-3 h-7 tracking-widest outline-none transition-colors font-bold ${isDarkMode 
+                        className={`border rounded text-[10px] uppercase w-48 pl-8 pr-3 h-7 tracking-widest outline-none transition-colors font-bold ${isDarkMode 
                             ? 'bg-transparent hover:bg-white/5 border-white/20 focus:border-white/40 text-white placeholder:text-white/40' 
                             : 'bg-white border-transparent text-slate-800 placeholder:text-slate-500 focus:ring-2 focus:ring-[#3CA317]/50 focus:border-[#3CA317]'
                         }`}
@@ -261,7 +297,7 @@ export const ShiftOperatorsSection: React.FC<ShiftOperatorsSectionProps> = ({
                         <button 
                             key={cycle} 
                             onClick={() => setActiveShift(cycle)} 
-                            className={`px-4 py-2 rounded-md text-[9px] font-black tracking-widest transition-all ${
+                            className={`px-3 py-1.5 rounded-md text-[9px] font-black tracking-widest transition-all ${
                                 activeShift === cycle 
                                     ? (isDarkMode ? 'bg-slate-800 text-emerald-400 border border-emerald-500/10' : 'bg-white text-[#2D8E48] border-transparent shadow-sm') 
                                     : (isDarkMode ? 'text-slate-700 hover:text-slate-500' : 'text-white/60 hover:text-white')
@@ -276,49 +312,9 @@ export const ShiftOperatorsSection: React.FC<ShiftOperatorsSectionProps> = ({
     </div>
   );
 
-  const telemetryBar = (
-    <div className={`h-16 shrink-0 border-b px-8 flex items-center justify-between z-30 ${isDarkMode ? "bg-slate-950 border-slate-800/40 text-slate-200" : "bg-[#2D8E48] border-[#206a34] text-white shadow-[0_2px_8px_rgba(0,0,0,0.5)]"} w-full`}>
-        <div className="flex items-center gap-10">
-            {/* Status Operacional */}
-            <div className="flex items-center gap-8">
-                <div className={`flex items-center gap-3 px-4 py-1.5 rounded-md border ${isDarkMode ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-white/10 border-white/20'}`}>
-                    <div className="text-center">
-                        <span className={`text-[8px] font-black uppercase tracking-widest block mb-0.5 ${isDarkMode ? 'text-emerald-500/60' : 'text-emerald-100'}`}>Disponíveis</span>
-                        <span className={`text-lg font-black font-mono leading-none ${isDarkMode ? 'text-emerald-500' : 'text-emerald-300'}`}>{teamStats.disponivel}</span>
-                    </div>
-                    <Users size={16} className={`${isDarkMode ? 'text-emerald-500 opacity-30' : 'text-white opacity-60'}`} />
-                </div>
-                <div className={`flex items-center gap-3 px-4 py-1.5 rounded-md border ${isDarkMode ? 'bg-yellow-500/5 border-yellow-500/10' : 'bg-white/10 border-white/20'}`}>
-                    <div className="text-center">
-                        <span className={`text-[8px] font-black uppercase tracking-widest block mb-0.5 ${isDarkMode ? 'text-yellow-500/60' : 'text-yellow-100'}`}>Ocupados</span>
-                        <span className={`text-lg font-black font-mono leading-none ${isDarkMode ? 'text-yellow-500' : 'text-yellow-300'}`}>{teamStats.enchendo + teamStats.designado}</span>
-                    </div>
-                    <Droplet size={16} className={`${isDarkMode ? 'text-yellow-500 opacity-30' : 'text-white opacity-60'}`} />
-                </div>
-                <div className={`flex items-center gap-3 px-4 py-1.5 rounded-md border ${isDarkMode ? 'bg-blue-500/5 border-blue-500/10' : 'bg-white/10 border-white/20'}`}>
-                    <div className="text-center">
-                        <span className={`text-[8px] font-black uppercase tracking-widest block mb-0.5 ${isDarkMode ? 'text-blue-400/60' : 'text-blue-100'}`}>Designados</span>
-                        <span className={`text-lg font-black font-mono leading-none ${isDarkMode ? 'text-blue-400' : 'text-blue-300'}`}>{teamStats.designado}</span>
-                    </div>
-                    <BusFront size={16} className={`${isDarkMode ? 'text-blue-400 opacity-30' : 'text-white opacity-60'}`} />
-                </div>
-            </div>
-        </div>
-
-        <div className="flex flex-col items-end">
-            <span className={`text-[8px] font-black uppercase tracking-widest mb-1 ${isDarkMode ? 'text-slate-600' : 'text-white/60'}`}>Turno Ativo</span>
-            <div className="flex items-center gap-2">
-                <span className={`text-xs font-black font-mono ${isDarkMode ? 'text-slate-400' : 'text-white'}`}>{activeShift}</span>
-            </div>
-        </div>
-    </div>
-  );
-
   return (
     <div className={`w-full h-full flex flex-col overflow-hidden font-sans ${isDarkMode ? 'bg-slate-950 text-slate-200' : 'bg-white text-slate-800'}`}>
         {portalTarget ? createPortal(headers, portalTarget) : headers}
-        
-        {telemetryBar}
 
         {/* OPERATIONAL GRID - DISPONÍVEIS NO TOPO */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-3">

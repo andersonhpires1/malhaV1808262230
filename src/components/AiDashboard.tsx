@@ -395,30 +395,30 @@ Gostaria de estruturar uma contraproposta oficial com isso para você apresentar
     <div className={`w-full h-full flex flex-col overflow-hidden ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-800'}`}>
       
       {/* Header do Provedor de IA */}
-      <div className={`px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between border-b shrink-0 ${
+      <div className={`h-16 shrink-0 flex items-center justify-between px-6 border-b z-20 ${
         isDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-[#E2E8F0] border-transparent shadow-[0_2px_8px_rgba(0,0,0,0.5)] text-slate-900'
       }`}>
         <div className="flex items-center gap-3">
-          <div className="p-2 mb-2 md:mb-0 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/30">
-            <Brain size={24} className="animate-pulse" />
+          <div className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg border border-emerald-500/30">
+            <Brain size={20} className="animate-pulse" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-black uppercase tracking-widest leading-none">
-                Co-Piloto de IA & Painel de Gargalhos (30 Dias)
+                Co-Piloto de IA & Painel de Gargalos
               </h2>
               <span className="px-2 py-0.5 bg-emerald-500/20 text-[9px] text-emerald-400 font-extrabold rounded-full border border-emerald-500/30 uppercase tracking-widest animate-pulse">
                  Enterprise Ready
               </span>
             </div>
-            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wide mt-1">
-              Prova de Conceito de Modelagem de Dados preditivas e Contra-ataque de TI Sbgr
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wide mt-0.5 leading-none">
+              Modelagem preditiva e Inteligência de Pátio SBGR
             </p>
           </div>
         </div>
 
         {/* Abas */}
-        <div className="flex gap-1.5 mt-3 md:mt-0 p-1 bg-slate-950/40 rounded-lg">
+        <div className="flex gap-1.5 p-1 bg-slate-950/40 rounded-lg">
           <button
             onClick={() => setActiveTab('ANALYTICS')}
             className={`px-3 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${

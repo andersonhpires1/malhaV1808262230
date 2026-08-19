@@ -504,14 +504,14 @@ export const AirlinesAdmin: React.FC<AirlinesAdminProps> = ({ isDarkMode }) => {
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden relative">
         {/* HEADER */}
-        <div className={`flex justify-between items-end px-6 py-4 border-b shrink-0 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+        <div className={`h-16 shrink-0 flex items-center justify-between px-6 border-b z-20 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
            <div className="flex flex-col justify-center">
                <div className="flex items-center gap-2">
                     <Database size={16} className={isDarkMode ? 'text-emerald-500' : 'text-emerald-600'} />
-                    <h1 className="text-sm font-black uppercase tracking-widest">Companhias Aéreas</h1>
+                    <h1 className="text-sm font-black uppercase tracking-widest leading-none">Companhias Aéreas</h1>
                     {isLoading && <RefreshCw size={12} className="animate-spin ml-2 text-slate-500" />}
                </div>
-               <span className={`text-[10px] font-medium tracking-wide ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Gerencie o banco de dados de companhias aéreas</span>
+               <span className={`text-[10px] font-medium tracking-wide leading-none mt-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Gerencie o banco de dados de companhias aéreas</span>
            </div>
            
            <div className="flex items-center gap-3">
