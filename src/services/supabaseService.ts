@@ -1195,6 +1195,15 @@ export const upsertFlight = async (flight: FlightData): Promise<void> => {
   }
 
   if (errorToThrow) {
+    if (errorToThrow.message.includes('record "new" has no field "companhia_id"')) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('supabase-trigger-companhia-error', { 
+          detail: { message: errorToThrow.message } 
+        }));
+      }
+      console.warn('[Supabase Enterprise Alert] Conflito de gatilho detectado no banco de dados. A coluna "companhia_id" precisa ser adicionada na tabela "malha_operacional". O sistema continuará operando em modo de contingência local com segurança.', errorToThrow.message);
+      return;
+    }
     if (errorToThrow.message.includes("Could not find the table") || (errorToThrow.message.includes("relation") && errorToThrow.message.includes("does not exist"))) {
         throw new Error(`ESTRUTURA DA TABELA INVÁLIDA!\nVá ao SQL Editor no Supabase e rode o script abaixo para criar a tabela:\n\n` +
           `CREATE TABLE IF NOT EXISTS malha_operacional (\n` +
@@ -1607,6 +1616,15 @@ export const bulkInsertFlights = async (flights: FlightData[]): Promise<void> =>
     }
 
     if (errorToThrow) {
+        if (errorToThrow.message.includes('record "new" has no field "companhia_id"')) {
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('supabase-trigger-companhia-error', { 
+                    detail: { message: errorToThrow.message } 
+                }));
+            }
+            console.warn('[Supabase Enterprise Alert] Conflito de gatilho detectado em lote. A coluna "companhia_id" precisa ser adicionada na tabela "malha_operacional". O sistema continuará operando em modo de contingência local com segurança.', errorToThrow.message);
+            continue; // Continue with other chunks, or break
+        }
         console.error('[Supabase] Error bulk inserting flights chunk:', errorToThrow.message);
         if (errorToThrow.message.includes("Could not find the table") || errorToThrow.message.includes("relation") && errorToThrow.message.includes("does not exist")) {
             throw new Error(`ESTRUTURA DA TABELA INVÁLIDA!\nVá ao SQL Editor no Supabase e rode o script abaixo para criar a tabela:\n\n` +

@@ -313,10 +313,24 @@ const App: React.FC = () => {
       }
     };
     window.addEventListener('supabase-missing-tables', handleMissingTables);
+
+    const handleTriggerError = (e: Event) => {
+      const ddlScript = `ALTER TABLE public.malha_operacional \n` +
+        `  ADD COLUMN IF NOT EXISTS companhia_id uuid REFERENCES public.companhias(id) ON DELETE SET NULL;`;
+      
+      let instruction = `Estrutura do banco de dados incompleta: conflito de gatilhos detectado.\n\n`;
+      instruction += `O gatilho de auto-associação de companhias falhou porque a coluna "companhia_id" não existe na tabela "malha_operacional" do seu Supabase.\n\n`;
+      instruction += `Para resolver isso definitivamente e habilitar a persistência inteira via Supabase (MALHA Enterprise), execute o comando abaixo no SQL Editor no painel do Supabase do seu projeto:\n\n`;
+      instruction += ddlScript;
+      
+      setSupabaseError(instruction);
+    };
+    window.addEventListener('supabase-trigger-companhia-error', handleTriggerError);
     
     return () => {
       window.removeEventListener('supabase-network-state', handleNetworkState);
       window.removeEventListener('supabase-missing-tables', handleMissingTables);
+      window.removeEventListener('supabase-trigger-companhia-error', handleTriggerError);
     };
   }, []);
 
