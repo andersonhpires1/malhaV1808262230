@@ -600,4 +600,21 @@
     background: var(--dark-green) !important;
     color: #ffffff !important;
   }
+
+  /* =======================================================
+     ESTILOS RADAR / LEAFLET DARK MODE
+     ======================================================= */
+  .leaflet-bar {
+    border: 1px solid rgba(51, 65, 85, 0.8) !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+  }
+  .leaflet-bar a {
+    background-color: rgba(2, 6, 23, 0.9) !important;
+    color: #94a3b8 !important;
+    border-bottom: 1px solid rgba(51, 65, 85, 0.8) !important;
+  }
+  .leaflet-bar a:hover {
+    background-color: rgba(15, 23, 42, 0.95) !important;
+    color: #34d399 !important;
+  }
 }

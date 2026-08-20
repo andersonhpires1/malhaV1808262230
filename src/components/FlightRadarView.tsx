@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  Compass, Search, Activity, RefreshCw, 
-  AlertTriangle, SlidersHorizontal, Link2
+  Compass, Search, X, Plane, ChevronLeft
 } from 'lucide-react';
-import { getNormalizedAirlineInfo } from './AirlineLogo';
 import { FlightRadarFlightCard, formatMalhaFlightNumber } from './FlightRadarFlightCard';
 
 interface FlightPosition {
@@ -30,6 +28,7 @@ export const FlightRadarView: React.FC = () => {
   const [, setError] = useState<string | null>(null);
   const [, setDataSource] = useState<'flightradar24' | 'simulation' | 'contingency'>('simulation');
   const [selectedFlight, setSelectedFlight] = useState<FlightPosition | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   
   // Leaflet states & refs
   const [leafletLoaded, setLeafletLoaded] = useState(false);
@@ -38,10 +37,8 @@ export const FlightRadarView: React.FC = () => {
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedAirline, setSelectedAirline] = useState('ALL');
-  const [selectedStatus, setSelectedStatus] = useState('ALL');
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [refreshInterval, setRefreshInterval] = useState(10);
+  const [autoRefresh] = useState(true);
+  const [refreshInterval] = useState(10);
 
   const SBGR_LAT = -23.4356;
   const SBGR_LON = -46.4731;
@@ -151,14 +148,6 @@ export const FlightRadarView: React.FC = () => {
     return () => clearInterval(interval);
   }, [autoRefresh, refreshInterval]);
 
-  const airlinesList = useMemo(() => {
-    const list = new Set<string>();
-    flights.forEach(f => {
-      if (f.airline) list.add(f.airline.toUpperCase());
-    });
-    return ['ALL', ...Array.from(list)];
-  }, [flights]);
-
   const getDistanceNM = (lat: number, lon: number) => {
     const degToRad = Math.PI / 180;
     const phi1 = SBGR_LAT * degToRad;
@@ -178,17 +167,17 @@ export const FlightRadarView: React.FC = () => {
       const isArrival = f.destination === 'SBGR' || f.destination === 'GRU';
       if (!isArrival) return false;
 
-      const matchSearch = 
+      const malhaCode = formatMalhaFlightNumber(f.flight, f.callsign, f.airline);
+
+      return (
         f.flight.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        malhaCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
         f.registration.toLowerCase().includes(searchTerm.toLowerCase()) ||
         f.callsign.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        f.aircraft_type.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchAirline = selectedAirline === 'ALL' || f.airline.toUpperCase() === selectedAirline;
-
-      return matchSearch && matchAirline;
+        f.aircraft_type.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     });
-  }, [flights, searchTerm, selectedAirline]);
+  }, [flights, searchTerm]);
 
   // Carregamento dinâmico e seguro do Leaflet
   useEffect(() => {
@@ -222,16 +211,19 @@ export const FlightRadarView: React.FC = () => {
     if (!L) return;
 
     const mapInstance = L.map('leaflet-map-element', {
-      zoomControl: true,
+      zoomControl: false,
       attributionControl: false
     }).setView([SBGR_LAT, SBGR_LON], 11);
+
+    // Zoom control estilizado no canto inferior esquerdo para não obstruir
+    L.control.zoom({ position: 'bottomleft' }).addTo(mapInstance);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 18
     }).addTo(mapInstance);
 
     const airportIcon = L.divIcon({
-      html: `<div class="bg-emerald-500 border-2 border-white rounded-full w-[17px] h-[17px] flex items-center justify-center shadow-lg shadow-emerald-500/40 animate-pulse"><div class="bg-white w-[7px] h-[7px] rounded-full"></div></div>`,
+      html: `<div class="bg-emerald-500 border-2 border-white rounded-full w-[18px] h-[18px] flex items-center justify-center shadow-lg shadow-emerald-500/40 animate-pulse"><div class="bg-white w-[7px] h-[7px] rounded-full"></div></div>`,
       className: 'custom-airport-icon',
       iconSize: [18, 18],
       iconAnchor: [9, 9]
@@ -245,7 +237,7 @@ export const FlightRadarView: React.FC = () => {
 
     setTimeout(() => {
       mapInstance.invalidateSize();
-    }, 200);
+    }, 150);
 
     return () => {
       if (mapRef.current) {
@@ -266,38 +258,29 @@ export const FlightRadarView: React.FC = () => {
     const newMarkers: { [key: string]: any } = {};
 
     filteredFlights.forEach((f) => {
-      const flightId = f.flight_id || f.flight;
-      const isSelected = selectedFlight?.flight_id === f.flight_id;
-      const isLATAM = f.airline?.toUpperCase() === 'LATAM';
-      const isGOL = f.airline?.toUpperCase() === 'GOL';
-      const isAZUL = f.airline?.toUpperCase() === 'AZUL';
-      const trackAngle = f.track || 0;
-
-      let markerClass = 'text-cyan-400';
-      if (isLATAM) markerClass = 'text-purple-400';
-      else if (isGOL) markerClass = 'text-orange-400';
-      else if (isAZUL) markerClass = 'text-sky-400';
-
-      if (isSelected) markerClass = 'text-emerald-400';
+      const flightId = f.flight_id || `${f.flight}-${f.registration}`;
+      const isSelected = selectedFlight && (selectedFlight.flight_id === f.flight_id || selectedFlight.flight === f.flight);
+      
+      const malhaCode = formatMalhaFlightNumber(f.flight, f.callsign, f.airline);
 
       const flightIcon = L.divIcon({
         html: `
-          <div class="relative flex flex-col items-center">
-            <div class="w-[26px] h-[26px] rounded-lg bg-slate-950/95 border ${isSelected ? 'border-emerald-400 shadow-lg shadow-emerald-500/30' : 'border-slate-800'} flex items-center justify-center transition-all">
-              <div style="transform: rotate(${trackAngle}deg);" class="transition-transform duration-500 ${markerClass}">
-                <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
-                  <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L14 19v-5.5L21 16z"/>
+          <div class="relative flex flex-col items-center group cursor-pointer transition-transform duration-200 hover:scale-115">
+            <div style="transform: rotate(${f.track}deg);" class="transition-transform duration-300 flex items-center justify-center">
+              <div class="${isSelected ? 'text-amber-400 scale-120 drop-shadow-[0_0_12px_rgba(251,191,36,0.9)] animate-pulse' : 'text-emerald-400 hover:text-emerald-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]'} transition-all">
+                <svg width="26" height="26" viewBox="0 0 100 100" fill="currentColor">
+                  <path d="M50 2 C47.5 2 45.5 5 45.5 11 L45.5 40 L8 60 L8 68 L45.5 56 L45.5 82 L33 90 L33 96 L50 92 L67 96 L67 90 L54.5 82 L54.5 56 L92 68 L92 60 L54.5 40 L54.5 11 C54.5 5 52.5 2 50 2 Z"/>
                 </svg>
               </div>
             </div>
-            <div class="mt-0.5 bg-slate-950/85 border border-slate-800/80 text-[7.5px] font-mono font-bold ${isSelected ? 'text-emerald-400 border-emerald-500/40 font-black' : 'text-slate-200'} px-1 py-0 rounded whitespace-nowrap shadow">
-              ${formatMalhaFlightNumber(f.flight, f.callsign, f.airline)}
+            <div class="mt-1 bg-slate-950/90 backdrop-blur-sm border border-slate-800/90 text-[8px] font-mono font-bold ${isSelected ? 'text-amber-400 border-amber-500/60 font-black scale-105 shadow-amber-500/20' : 'text-slate-200'} px-1.5 py-0.5 rounded-md shadow-lg whitespace-nowrap">
+              ${malhaCode}
             </div>
           </div>
         `,
         className: 'custom-flight-icon',
-        iconSize: [26, 26],
-        iconAnchor: [13, 13]
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
       });
 
       if (currentMarkers[flightId]) {
@@ -310,6 +293,7 @@ export const FlightRadarView: React.FC = () => {
           .addTo(map)
           .on('click', () => {
             setSelectedFlight(f);
+            setIsSidebarOpen(true);
           });
         newMarkers[flightId] = marker;
       }
@@ -329,81 +313,201 @@ export const FlightRadarView: React.FC = () => {
     }
   }, [selectedFlight, leafletLoaded]);
 
+  // Redimensionamento automático do Leaflet ao expandir/recolher o sidebar
   useEffect(() => {
     if (mapRef.current && leafletLoaded) {
-      setTimeout(() => {
-        mapRef.current.invalidateSize();
-      }, 150);
+      const timer1 = setTimeout(() => {
+        if (mapRef.current) mapRef.current.invalidateSize();
+      }, 50);
+      const timer2 = setTimeout(() => {
+        if (mapRef.current) mapRef.current.invalidateSize();
+      }, 250);
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+      };
     }
-  }, [leafletLoaded]);
+  }, [isSidebarOpen, leafletLoaded]);
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 p-3 w-full h-[calc(100vh-120px)] min-h-0 overflow-hidden text-slate-100 bg-slate-950 font-sans">
+    <div className="w-full h-full min-h-0 relative overflow-hidden bg-slate-950 text-slate-100 font-sans flex flex-row">
       
-      {/* SEÇÃO ESQUERDA: MAPA PRINCIPAL (DIRETO SEM DIVS ANINHADAS) */}
-      <div className="flex-1 shrink-0 bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl relative overflow-hidden min-h-[300px] h-full">
-        {!leafletLoaded ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-950/80 z-20">
+      {/* =========================================================================
+          MAPA RADAR EM TELA CHEIA (100% DA ÁREA ÚTIL SEM BORDAS OU RODAPÉS VAZIOS)
+          ========================================================================= */}
+      <div className="flex-1 w-full h-full relative overflow-hidden">
+        {!leafletLoaded && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-950 z-20">
             <div className="w-8 h-8 rounded-full border-2 border-emerald-500/20 border-t-emerald-400 animate-spin"></div>
-            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest animate-pulse">Carregando bases cartográficas...</span>
+            <span className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-widest animate-pulse">Carregando bases cartográficas radar...</span>
           </div>
-        ) : null}
-        <div id="leaflet-map-element" className="w-full h-full min-h-[300px]" style={{ height: '100%', width: '100%' }} />
+        )}
         
-        <div className="absolute bottom-3 right-3 z-[1000] bg-slate-950/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-800/80 text-[10px] font-mono text-slate-400 shadow-lg">
-          SBGR CTR • -23.4356° | -46.4731°
+        <div id="leaflet-map-element" className="w-full h-full" style={{ height: '100%', width: '100%' }} />
+
+        {/* GATILHO COMPACTO E ELEGANTE NO TOPO DIREITO: ABRE O SIDEBAR SOB DEMANDA */}
+        <div className="absolute top-4 right-4 z-[900]">
+          <button
+            onClick={() => setIsSidebarOpen(prev => !prev)}
+            className="flex items-center gap-2 px-3.5 py-2 bg-slate-950/90 hover:bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-xl shadow-2xl backdrop-blur-md text-slate-200 hover:text-white transition-all group cursor-pointer"
+            title={isSidebarOpen ? "Recolher painel" : "Abrir busca e lista de aeronaves"}
+          >
+            <Search size={14} className="text-emerald-400 group-hover:scale-110 transition-transform" />
+            <span className="text-xs font-bold font-sans">
+              {isSidebarOpen ? 'Fechar Painel' : 'Buscar & Aeronaves'}
+            </span>
+            <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[10px] font-mono font-black">
+              {filteredFlights.length}
+            </span>
+          </button>
         </div>
       </div>
 
-      {/* SEÇÃO DIREITA: LISTAGEM E PAINEL OPERACIONAL (RESPONSIVIDADE INTELIGENTE COM ALTURA LIMITADA EM VIEWS COMPACTAS E SCROLLBAR OPERACIONAL) */}
-      <div className="w-full lg:w-[380px] shrink-0 flex flex-col gap-3 h-[420px] max-h-[420px] lg:h-full lg:max-h-full overflow-y-auto pr-3 scrollbar-thin scrollbar-thumb-slate-700">
-        
-        {/* FILTROS E PESQUISA */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl shrink-0">
-          <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2.5 flex items-center gap-2">
-            <SlidersHorizontal size={13} className="text-emerald-500" />
-            <span>Painel de Filtros Operacionais</span>
-          </h3>
+      {/* =========================================================================
+          SIDEBAR RETRÁTIL (DRAWER LATERAL SOB DEMANDA COM BUSCA E TELEMETRIA)
+          ========================================================================= */}
+      {isSidebarOpen && (
+        <div className="w-full sm:w-[400px] lg:w-[430px] h-full shrink-0 bg-slate-950 border-l border-slate-800/90 shadow-2xl flex flex-col z-[1000] animate-in slide-in-from-right duration-200">
+          
+          {/* CABEÇALHO DO SIDEBAR */}
+          <div className="p-3.5 bg-slate-900/90 border-b border-slate-800/80 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <Plane size={15} />
+              </div>
+              <div>
+                <h2 className="text-xs font-black tracking-wider text-slate-100 uppercase">Radar de Aproximação</h2>
+                <p className="text-[10px] font-mono text-emerald-400 font-bold">SBGR • {filteredFlights.length} voos em aproximação</p>
+              </div>
+            </div>
+            
+            <button
+              onClick={() => {
+                setIsSidebarOpen(false);
+                setSelectedFlight(null);
+              }}
+              className="p-1.5 text-slate-400 hover:text-white bg-slate-950 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-500/40 rounded-lg transition-colors cursor-pointer"
+              title="Recolher painel lateral"
+            >
+              <X size={16} />
+            </button>
+          </div>
 
-          <div className="flex flex-col gap-3">
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                <Search size={13} />
+          {/* FERRAMENTA DE BUSCA DENTRO DO SIDEBAR */}
+          <div className="p-3 bg-slate-950 border-b border-slate-800/80 shrink-0">
+            <div className="relative flex items-center">
+              <span className="absolute left-3 text-slate-500 pointer-events-none">
+                <Search size={14} />
               </span>
               <input 
                 type="text"
-                placeholder="Filtrar por voo, prefixo ou tipo..."
+                placeholder="Buscar voo (ex: LA1234, PR-XTB, A320)..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-xs placeholder:text-slate-600 focus:outline-none focus:border-emerald-500 transition-colors"
+                autoFocus
+                className="w-full pl-9 pr-8 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 text-xs placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 transition-all font-mono"
               />
+              {searchTerm && (
+                <button 
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2.5 text-slate-400 hover:text-white p-0.5 rounded transition-colors cursor-pointer"
+                  title="Limpar busca"
+                >
+                  <X size={13} />
+                </button>
+              )}
             </div>
           </div>
+
+          {/* CORPO DO SIDEBAR: TELEMETRIA OU LISTA DE AERONAVES */}
+          <div className="flex-1 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-slate-700 space-y-3">
+            {selectedFlight ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => setSelectedFlight(null)}
+                    className="flex items-center gap-1 text-[11px] font-bold text-slate-400 hover:text-emerald-400 bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <ChevronLeft size={13} />
+                    <span>Voltar à lista de voos</span>
+                  </button>
+                  <span className="text-[10px] font-mono text-slate-500 uppercase">Telemetria ao Vivo</span>
+                </div>
+
+                <FlightRadarFlightCard 
+                  flight={selectedFlight}
+                  onClose={() => setSelectedFlight(null)}
+                  onIntegrate={(f) => {
+                    console.log("Integrado ao SSoT calços:", f);
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">
+                  <span>Aeronaves em Aproximação</span>
+                  <span className="text-[10px] font-mono text-slate-500">{filteredFlights.length} ativas</span>
+                </div>
+
+                {filteredFlights.length === 0 ? (
+                  <div className="p-8 text-center bg-slate-900/50 border border-slate-800/80 rounded-2xl">
+                    <Compass size={28} className="mx-auto text-slate-600 mb-2" />
+                    <p className="text-xs font-bold text-slate-300">Nenhum voo encontrado</p>
+                    <p className="text-[10px] text-slate-500 mt-1">Tente ajustar os termos da pesquisa.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {filteredFlights.map((f) => {
+                      const malhaCode = formatMalhaFlightNumber(f.flight, f.callsign, f.airline);
+                      const distNM = getDistanceNM(f.lat, f.lon);
+
+                      return (
+                        <div
+                          key={f.flight_id || `${f.flight}-${f.registration}`}
+                          onClick={() => {
+                            setSelectedFlight(f);
+                            if (mapRef.current) {
+                              mapRef.current.setView([f.lat, f.lon], 12);
+                            }
+                          }}
+                          className="p-2.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-emerald-500/40 rounded-xl cursor-pointer transition-all flex items-center justify-between group"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center text-emerald-400 group-hover:border-emerald-500/30 shrink-0">
+                              <Plane size={15} style={{ transform: `rotate(${f.track}deg)` }} className="transition-transform duration-300" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-black font-mono text-amber-400 tracking-tight">{malhaCode}</span>
+                                <span className="text-[10px] font-mono text-slate-400">{f.registration}</span>
+                              </div>
+                              <div className="text-[10px] text-slate-400 truncate flex items-center gap-1 mt-0.5">
+                                <span className="font-bold text-slate-300">{f.origin}</span>
+                                <span>➔</span>
+                                <span className="font-bold text-emerald-400">SBGR</span>
+                                <span className="text-slate-600">•</span>
+                                <span className="font-mono text-slate-400">{f.aircraft_type}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <div className="text-xs font-mono font-black text-slate-200">{f.alt.toLocaleString()} <span className="text-[9px] text-slate-500 font-sans">ft</span></div>
+                            <div className="text-[10px] font-mono text-emerald-400 font-bold">{distNM} <span className="text-[9px] text-slate-500 font-sans">NM</span></div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
         </div>
-
-        {/* CONTEÚDO PRINCIPAL: DETALHES DE TELEMETRIA OU AVISO DE SELEÇÃO */}
-        {selectedFlight ? (
-          <FlightRadarFlightCard 
-            flight={selectedFlight}
-            onClose={() => setSelectedFlight(null)}
-            onIntegrate={(f) => {
-              console.log("Integrado ao SSoT calços:", f);
-            }}
-          />
-        ) : (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center flex-1 flex flex-col items-center justify-center gap-3 min-h-[240px] animate-fade-in shadow-xl">
-            <Compass size={32} className="text-slate-600 animate-pulse animate-duration-1000" />
-            <div>
-              <p className="text-xs font-black text-slate-300 uppercase tracking-widest">Nenhuma Aeronave Selecionada</p>
-              <p className="text-[10px] text-slate-500 mt-1.5 max-w-[220px] mx-auto leading-normal">
-                Clique em qualquer aeronave no mapa radar ou utilize a pesquisa para exibir a telemetria do voo ao vivo.
-              </p>
-            </div>
-          </div>
-        )}
-
-      </div>
+      )}
 
     </div>
   );
 };
+
