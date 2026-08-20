@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Plane, Star, X, Compass, Gauge, Clock, Radio, 
   TrendingDown, TrendingUp, Minus, Link2, CheckCircle2,
-  Navigation, Shield
+  Navigation, Shield, ArrowRight
 } from 'lucide-react';
 
 export interface FlightPosition {
@@ -33,64 +33,66 @@ interface FlightRadarFlightCardProps {
   onTogglePin?: () => void;
 }
 
-// Dicionário ampliado de aeroportos com IATA, ICAO, Cidade e Fuso Horário
+// Dicionário ampliado de aeroportos com IATA, ICAO, Cidade, UF e Fuso Horário
 interface AirportMeta {
   iata: string;
+  icao: string;
   city: string;
+  uf?: string;
   country: string;
   tz: string;
   name: string;
 }
 
 const AIRPORT_DATABASE: Record<string, AirportMeta> = {
-  'SBGR': { iata: 'GRU', city: 'SAO PAULO', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Guarulhos Intl' },
-  'GRU': { iata: 'GRU', city: 'SAO PAULO', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Guarulhos Intl' },
-  'LIS': { iata: 'LIS', city: 'LISBON', country: 'Portugal', tz: 'WEST (UTC +01:00)', name: 'Humberto Delgado' },
-  'LPPT': { iata: 'LIS', city: 'LISBON', country: 'Portugal', tz: 'WEST (UTC +01:00)', name: 'Humberto Delgado' },
-  'MIA': { iata: 'MIA', city: 'MIAMI', country: 'Estados Unidos', tz: 'EDT (UTC -04:00)', name: 'Miami International' },
-  'KMIA': { iata: 'MIA', city: 'MIAMI', country: 'Estados Unidos', tz: 'EDT (UTC -04:00)', name: 'Miami International' },
-  'JFK': { iata: 'JFK', city: 'NEW YORK', country: 'Estados Unidos', tz: 'EDT (UTC -04:00)', name: 'John F. Kennedy' },
-  'KJFK': { iata: 'JFK', city: 'NEW YORK', country: 'Estados Unidos', tz: 'EDT (UTC -04:00)', name: 'John F. Kennedy' },
-  'EWR': { iata: 'EWR', city: 'NEWARK', country: 'Estados Unidos', tz: 'EDT (UTC -04:00)', name: 'Newark Liberty' },
-  'MAD': { iata: 'MAD', city: 'MADRID', country: 'Espanha', tz: 'CEST (UTC +02:00)', name: 'Adolfo Suárez-Barajas' },
-  'LEMD': { iata: 'MAD', city: 'MADRID', country: 'Espanha', tz: 'CEST (UTC +02:00)', name: 'Adolfo Suárez-Barajas' },
-  'CDG': { iata: 'CDG', city: 'PARIS', country: 'França', tz: 'CEST (UTC +02:00)', name: 'Charles de Gaulle' },
-  'LFPG': { iata: 'CDG', city: 'PARIS', country: 'França', tz: 'CEST (UTC +02:00)', name: 'Charles de Gaulle' },
-  'LHR': { iata: 'LHR', city: 'LONDON', country: 'Reino Unido', tz: 'BST (UTC +01:00)', name: 'London Heathrow' },
-  'FRA': { iata: 'FRA', city: 'FRANKFURT', country: 'Alemanha', tz: 'CEST (UTC +02:00)', name: 'Frankfurt am Main' },
-  'DXB': { iata: 'DXB', city: 'DUBAI', country: 'Emirados Árabes', tz: 'GST (UTC +04:00)', name: 'Dubai International' },
-  'DOH': { iata: 'DOH', city: 'DOHA', country: 'Qatar', tz: 'AST (UTC +03:00)', name: 'Hamad International' },
-  'EZE': { iata: 'EZE', city: 'BUENOS AIRES', country: 'Argentina', tz: 'ART (UTC -03:00)', name: 'Ministro Pistarini' },
-  'AMS': { iata: 'AMS', city: 'AMSTERDAM', country: 'Holanda', tz: 'CEST (UTC +02:00)', name: 'Schiphol Airport' },
-  'EHAM': { iata: 'AMS', city: 'AMSTERDAM', country: 'Holanda', tz: 'CEST (UTC +02:00)', name: 'Schiphol Airport' },
-  'SCL': { iata: 'SCL', city: 'SANTIAGO', country: 'Chile', tz: 'CLT (UTC -04:00)', name: 'Arturo Merino Benítez' },
-  'BOG': { iata: 'BOG', city: 'BOGOTA', country: 'Colômbia', tz: 'COT (UTC -05:00)', name: 'El Dorado' },
-  'LIM': { iata: 'LIM', city: 'LIMA', country: 'Peru', tz: 'PET (UTC -05:00)', name: 'Jorge Chávez' },
-  'PTY': { iata: 'PTY', city: 'PANAMA CITY', country: 'Panamá', tz: 'EST (UTC -05:00)', name: 'Tocumen International' },
-  'SDU': { iata: 'SDU', city: 'RIO DE JANEIRO', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Santos Dumont' },
-  'SBRJ': { iata: 'SDU', city: 'RIO DE JANEIRO', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Santos Dumont' },
-  'GIG': { iata: 'GIG', city: 'RIO DE JANEIRO', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Galeão Tom Jobim' },
-  'SBGL': { iata: 'GIG', city: 'RIO DE JANEIRO', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Galeão Tom Jobim' },
-  'BSB': { iata: 'BSB', city: 'BRASILIA', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Presidente JK' },
-  'SBBR': { iata: 'BSB', city: 'BRASILIA', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Presidente JK' },
-  'SSA': { iata: 'SSA', city: 'SALVADOR', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Dep. Luís Eduardo' },
-  'SBSV': { iata: 'SSA', city: 'SALVADOR', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Dep. Luís Eduardo' },
-  'REC': { iata: 'REC', city: 'RECIFE', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Guararapes' },
-  'FOR': { iata: 'FOR', city: 'FORTALEZA', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Pinto Martins' },
-  'CNF': { iata: 'CNF', city: 'BELO HORIZONTE', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Confins Tancredo Neves' },
-  'POA': { iata: 'POA', city: 'PORTO ALEGRE', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Salgado Filho' },
-  'CWB': { iata: 'CWB', city: 'CURITIBA', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Afonso Pena' },
-  'VCP': { iata: 'VCP', city: 'CAMPINAS', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Viracopos' },
-  'FLN': { iata: 'FLN', city: 'FLORIANOPOLIS', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Hercílio Luz' },
-  'MCZ': { iata: 'MCZ', city: 'MACEIO', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Zumbi dos Palmares' },
-  'NAT': { iata: 'NAT', city: 'NATAL', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'São Gonçalo do Amarante' },
-  'BEL': { iata: 'BEL', city: 'BELEM', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Val-de-Cans' },
-  'MAO': { iata: 'MAO', city: 'MANAUS', country: 'Brasil', tz: '-04 (UTC -04:00)', name: 'Eduardo Gomes' },
-  'CGB': { iata: 'CGB', city: 'CUIABA', country: 'Brasil', tz: '-04 (UTC -04:00)', name: 'Marechal Rondon' },
-  'GYN': { iata: 'GYN', city: 'GOIANIA', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Santa Genoveva' },
-  'VIX': { iata: 'VIX', city: 'VITORIA', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Eurico de Aguiar Salles' },
-  'IGU': { iata: 'IGU', city: 'FOZ DO IGUACU', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Cataratas' },
-  'NVT': { iata: 'NVT', city: 'NAVEGANTES', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Victor Konder' }
+  'SBGR': { iata: 'GRU', icao: 'SBGR', city: 'SAO PAULO', uf: 'SP', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Guarulhos Intl' },
+  'GRU': { iata: 'GRU', icao: 'SBGR', city: 'SAO PAULO', uf: 'SP', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Guarulhos Intl' },
+  'LIS': { iata: 'LIS', icao: 'LPPT', city: 'LISBOA', uf: 'PT', country: 'Portugal', tz: 'WEST (UTC +01:00)', name: 'Humberto Delgado' },
+  'LPPT': { iata: 'LIS', icao: 'LPPT', city: 'LISBOA', uf: 'PT', country: 'Portugal', tz: 'WEST (UTC +01:00)', name: 'Humberto Delgado' },
+  'MIA': { iata: 'MIA', icao: 'KMIA', city: 'MIAMI', uf: 'US', country: 'Estados Unidos', tz: 'EDT (UTC -04:00)', name: 'Miami International' },
+  'KMIA': { iata: 'MIA', icao: 'KMIA', city: 'MIAMI', uf: 'US', country: 'Estados Unidos', tz: 'EDT (UTC -04:00)', name: 'Miami International' },
+  'JFK': { iata: 'JFK', icao: 'KJFK', city: 'NEW YORK', uf: 'US', country: 'Estados Unidos', tz: 'EDT (UTC -04:00)', name: 'John F. Kennedy' },
+  'KJFK': { iata: 'JFK', icao: 'KJFK', city: 'NEW YORK', uf: 'US', country: 'Estados Unidos', tz: 'EDT (UTC -04:00)', name: 'John F. Kennedy' },
+  'EWR': { iata: 'EWR', icao: 'KEWR', city: 'NEWARK', uf: 'US', country: 'Estados Unidos', tz: 'EDT (UTC -04:00)', name: 'Newark Liberty' },
+  'MAD': { iata: 'MAD', icao: 'LEMD', city: 'MADRID', uf: 'ES', country: 'Espanha', tz: 'CEST (UTC +02:00)', name: 'Adolfo Suárez-Barajas' },
+  'LEMD': { iata: 'MAD', icao: 'LEMD', city: 'MADRID', uf: 'ES', country: 'Espanha', tz: 'CEST (UTC +02:00)', name: 'Adolfo Suárez-Barajas' },
+  'CDG': { iata: 'CDG', icao: 'LFPG', city: 'PARIS', uf: 'FR', country: 'França', tz: 'CEST (UTC +02:00)', name: 'Charles de Gaulle' },
+  'LFPG': { iata: 'CDG', icao: 'LFPG', city: 'PARIS', uf: 'FR', country: 'França', tz: 'CEST (UTC +02:00)', name: 'Charles de Gaulle' },
+  'LHR': { iata: 'LHR', icao: 'EGLL', city: 'LONDON', uf: 'UK', country: 'Reino Unido', tz: 'BST (UTC +01:00)', name: 'London Heathrow' },
+  'FRA': { iata: 'FRA', icao: 'EDDF', city: 'FRANKFURT', uf: 'DE', country: 'Alemanha', tz: 'CEST (UTC +02:00)', name: 'Frankfurt am Main' },
+  'DXB': { iata: 'DXB', icao: 'OMDB', city: 'DUBAI', uf: 'AE', country: 'Emirados Árabes', tz: 'GST (UTC +04:00)', name: 'Dubai International' },
+  'DOH': { iata: 'DOH', icao: 'OTHH', city: 'DOHA', uf: 'QA', country: 'Qatar', tz: 'AST (UTC +03:00)', name: 'Hamad International' },
+  'EZE': { iata: 'EZE', icao: 'SAEZ', city: 'BUENOS AIRES', uf: 'AR', country: 'Argentina', tz: 'ART (UTC -03:00)', name: 'Ministro Pistarini' },
+  'AMS': { iata: 'AMS', icao: 'EHAM', city: 'AMSTERDAM', uf: 'NL', country: 'Holanda', tz: 'CEST (UTC +02:00)', name: 'Schiphol Airport' },
+  'EHAM': { iata: 'AMS', icao: 'EHAM', city: 'AMSTERDAM', uf: 'NL', country: 'Holanda', tz: 'CEST (UTC +02:00)', name: 'Schiphol Airport' },
+  'SCL': { iata: 'SCL', icao: 'SCEL', city: 'SANTIAGO', uf: 'CL', country: 'Chile', tz: 'CLT (UTC -04:00)', name: 'Arturo Merino Benítez' },
+  'BOG': { iata: 'BOG', icao: 'SKBO', city: 'BOGOTA', uf: 'CO', country: 'Colômbia', tz: 'COT (UTC -05:00)', name: 'El Dorado' },
+  'LIM': { iata: 'LIM', icao: 'SPJC', city: 'LIMA', uf: 'PE', country: 'Peru', tz: 'PET (UTC -05:00)', name: 'Jorge Chávez' },
+  'PTY': { iata: 'PTY', icao: 'MPTO', city: 'PANAMA CITY', uf: 'PA', country: 'Panamá', tz: 'EST (UTC -05:00)', name: 'Tocumen International' },
+  'SDU': { iata: 'SDU', icao: 'SBRJ', city: 'RIO DE JANEIRO', uf: 'RJ', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Santos Dumont' },
+  'SBRJ': { iata: 'SDU', icao: 'SBRJ', city: 'RIO DE JANEIRO', uf: 'RJ', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Santos Dumont' },
+  'GIG': { iata: 'GIG', icao: 'SBGL', city: 'RIO DE JANEIRO', uf: 'RJ', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Galeão Tom Jobim' },
+  'SBGL': { iata: 'GIG', icao: 'SBGL', city: 'RIO DE JANEIRO', uf: 'RJ', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Galeão Tom Jobim' },
+  'BSB': { iata: 'BSB', icao: 'SBBR', city: 'BRASILIA', uf: 'DF', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Presidente JK' },
+  'SBBR': { iata: 'BSB', icao: 'SBBR', city: 'BRASILIA', uf: 'DF', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Presidente JK' },
+  'SSA': { iata: 'SSA', icao: 'SBSV', city: 'SALVADOR', uf: 'BA', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Dep. Luís Eduardo' },
+  'SBSV': { iata: 'SSA', icao: 'SBSV', city: 'SALVADOR', uf: 'BA', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Dep. Luís Eduardo' },
+  'REC': { iata: 'REC', icao: 'SBRF', city: 'RECIFE', uf: 'PE', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Guararapes' },
+  'FOR': { iata: 'FOR', icao: 'SBFZ', city: 'FORTALEZA', uf: 'CE', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Pinto Martins' },
+  'CNF': { iata: 'CNF', icao: 'SBCF', city: 'BELO HORIZONTE', uf: 'MG', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Confins Tancredo Neves' },
+  'POA': { iata: 'POA', icao: 'SBPA', city: 'PORTO ALEGRE', uf: 'RS', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Salgado Filho' },
+  'CWB': { iata: 'CWB', icao: 'SBCT', city: 'CURITIBA', uf: 'PR', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Afonso Pena' },
+  'VCP': { iata: 'VCP', icao: 'SBKP', city: 'CAMPINAS', uf: 'SP', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Viracopos' },
+  'FLN': { iata: 'FLN', icao: 'SBFL', city: 'FLORIANOPOLIS', uf: 'SC', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Hercílio Luz' },
+  'MCZ': { iata: 'MCZ', icao: 'SBMO', city: 'MACEIO', uf: 'AL', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Zumbi dos Palmares' },
+  'NAT': { iata: 'NAT', icao: 'SBSG', city: 'NATAL', uf: 'RN', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'São Gonçalo do Amarante' },
+  'BEL': { iata: 'BEL', icao: 'SBBE', city: 'BELEM', uf: 'PA', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Val-de-Cans' },
+  'MAO': { iata: 'MAO', icao: 'SBEG', city: 'MANAUS', uf: 'AM', country: 'Brasil', tz: '-04 (UTC -04:00)', name: 'Eduardo Gomes' },
+  'CGB': { iata: 'CGB', icao: 'SBCY', city: 'CUIABA', uf: 'MT', country: 'Brasil', tz: '-04 (UTC -04:00)', name: 'Marechal Rondon' },
+  'GYN': { iata: 'GYN', icao: 'SBGO', city: 'GOIANIA', uf: 'GO', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Santa Genoveva' },
+  'VIX': { iata: 'VIX', icao: 'SBVT', city: 'VITORIA', uf: 'ES', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Eurico de Aguiar Salles' },
+  'IGU': { iata: 'IGU', icao: 'SBFI', city: 'FOZ DO IGUACU', uf: 'PR', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Cataratas' },
+  'NVT': { iata: 'NVT', icao: 'SBNF', city: 'NAVEGANTES', uf: 'SC', country: 'Brasil', tz: '-03 (UTC -03:00)', name: 'Victor Konder' }
 };
 
 function getAirportMeta(code: string): AirportMeta {
@@ -100,6 +102,7 @@ function getAirportMeta(code: string): AirportMeta {
   }
   return {
     iata: clean.length === 4 && clean.startsWith('SB') ? clean.substring(2) : clean || '---',
+    icao: clean.length === 4 ? clean : (clean.length === 3 ? `SB${clean.substring(1)}` : clean || '----'),
     city: clean || 'DESCONHECIDO',
     country: 'Internacional',
     tz: '-03 (UTC -03:00)',
@@ -107,27 +110,238 @@ function getAirportMeta(code: string): AirportMeta {
   };
 }
 
-// Nomes completos e descrições das companhias aéreas
-function getFullAirlineTitle(airline: string, flight: string): { title: string; subtitle: string } {
+// Nomes completos, descrições e logos das companhias aéreas
+function getFullAirlineTitle(airline: string, flight: string): { title: string; subtitle: string; logoUrl?: string; code: string } {
   const norm = (airline || '').toUpperCase();
-  if (norm.includes('TAP')) return { title: 'TAP Air Portugal', subtitle: 'TAP Air Portugal (Fleet Flight)' };
-  if (norm.includes('LATAM') || flight.startsWith('LA') || flight.startsWith('TAM') || flight.startsWith('JJ')) {
-    return { title: 'LATAM Airlines Brasil', subtitle: 'LATAM Group (South America Operations)' };
+  const fNorm = (flight || '').toUpperCase();
+  
+  if (norm.includes('TAP') || fNorm.startsWith('TP') || fNorm.startsWith('TAP')) {
+    return { 
+      title: 'TAP Air Portugal', 
+      subtitle: 'TAP Air Portugal (Fleet Flight)',
+      logoUrl: 'https://images.kiwi.com/airlines/64/TP.png',
+      code: 'TP'
+    };
   }
-  if (norm.includes('GOL') || flight.startsWith('G3') || flight.startsWith('GLO')) {
-    return { title: 'GOL Linhas Aéreas', subtitle: 'GOL Inteligente (Domestic & Mercosul)' };
+  if (norm.includes('LATAM') || fNorm.startsWith('LA') || fNorm.startsWith('TAM') || fNorm.startsWith('JJ')) {
+    return { 
+      title: 'LATAM Airlines Brasil', 
+      subtitle: 'LATAM Group (South America Operations)',
+      logoUrl: 'https://images.kiwi.com/airlines/64/LA.png',
+      code: 'LA'
+    };
   }
-  if (norm.includes('AZUL') || flight.startsWith('AD') || flight.startsWith('AZU')) {
-    return { title: 'Azul Linhas Aéreas Brasileiras', subtitle: 'Azul Conecta & Linhas Principais' };
+  if (norm.includes('GOL') || fNorm.startsWith('G3') || fNorm.startsWith('GLO')) {
+    return { 
+      title: 'GOL Linhas Aéreas', 
+      subtitle: 'GOL Inteligente (Domestic & Mercosul)',
+      logoUrl: 'https://images.kiwi.com/airlines/64/G3.png',
+      code: 'G3'
+    };
   }
-  if (norm.includes('EMIRATES') || flight.startsWith('EK')) return { title: 'Emirates', subtitle: 'Fly Emirates (A380 / B777 Operations)' };
-  if (norm.includes('QATAR') || flight.startsWith('QR')) return { title: 'Qatar Airways', subtitle: 'Going Place Together' };
-  if (norm.includes('AMERICAN') || flight.startsWith('AA')) return { title: 'American Airlines', subtitle: 'American Airlines Fleet' };
-  if (norm.includes('UNITED') || flight.startsWith('UA')) return { title: 'United Airlines', subtitle: 'United Express & Mainline' };
-  if (norm.includes('DELTA') || flight.startsWith('DL')) return { title: 'Delta Air Lines', subtitle: 'Delta Connection' };
-  if (norm.includes('AIR FRANCE') || flight.startsWith('AF')) return { title: 'Air France', subtitle: 'Air France-KLM Group' };
-  if (norm.includes('LUFTHANSA') || flight.startsWith('LH')) return { title: 'Lufthansa', subtitle: 'Lufthansa Group' };
-  return { title: airline || 'Linha Aérea Comercial', subtitle: 'Operação Regular' };
+  if (norm.includes('AZUL') || fNorm.startsWith('AD') || fNorm.startsWith('AZU')) {
+    return { 
+      title: 'Azul Linhas Aéreas Brasileiras', 
+      subtitle: 'Azul Conecta & Linhas Principais',
+      logoUrl: 'https://images.kiwi.com/airlines/64/AD.png',
+      code: 'AD'
+    };
+  }
+  if (norm.includes('EMIRATES') || fNorm.startsWith('EK')) {
+    return { 
+      title: 'Emirates', 
+      subtitle: 'Fly Emirates (A380 / B777 Operations)',
+      logoUrl: 'https://images.kiwi.com/airlines/64/EK.png',
+      code: 'EK'
+    };
+  }
+  if (norm.includes('QATAR') || fNorm.startsWith('QR')) {
+    return { 
+      title: 'Qatar Airways', 
+      subtitle: 'Going Place Together',
+      logoUrl: 'https://images.kiwi.com/airlines/64/QR.png',
+      code: 'QR'
+    };
+  }
+  if (norm.includes('AMERICAN') || fNorm.startsWith('AA')) {
+    return { 
+      title: 'American Airlines', 
+      subtitle: 'American Airlines Fleet',
+      logoUrl: 'https://images.kiwi.com/airlines/64/AA.png',
+      code: 'AA'
+    };
+  }
+  if (norm.includes('UNITED') || fNorm.startsWith('UA')) {
+    return { 
+      title: 'United Airlines', 
+      subtitle: 'United Express & Mainline',
+      logoUrl: 'https://images.kiwi.com/airlines/64/UA.png',
+      code: 'UA'
+    };
+  }
+  if (norm.includes('DELTA') || fNorm.startsWith('DL')) {
+    return { 
+      title: 'Delta Air Lines', 
+      subtitle: 'Delta Connection',
+      logoUrl: 'https://images.kiwi.com/airlines/64/DL.png',
+      code: 'DL'
+    };
+  }
+  if (norm.includes('AIR FRANCE') || fNorm.startsWith('AF')) {
+    return { 
+      title: 'Air France', 
+      subtitle: 'Air France-KLM Group',
+      logoUrl: 'https://images.kiwi.com/airlines/64/AF.png',
+      code: 'AF'
+    };
+  }
+  if (norm.includes('LUFTHANSA') || fNorm.startsWith('LH')) {
+    return { 
+      title: 'Lufthansa', 
+      subtitle: 'Lufthansa Group',
+      logoUrl: 'https://images.kiwi.com/airlines/64/LH.png',
+      code: 'LH'
+    };
+  }
+  if (norm.includes('KLM') || fNorm.startsWith('KL')) {
+    return { 
+      title: 'KLM Royal Dutch Airlines', 
+      subtitle: 'KLM Royal Dutch Airlines',
+      logoUrl: 'https://images.kiwi.com/airlines/64/KL.png',
+      code: 'KL'
+    };
+  }
+  if (norm.includes('IBERIA') || fNorm.startsWith('IB')) {
+    return { 
+      title: 'Iberia', 
+      subtitle: 'Iberia Líneas Aéreas',
+      logoUrl: 'https://images.kiwi.com/airlines/64/IB.png',
+      code: 'IB'
+    };
+  }
+  if (norm.includes('COPA') || fNorm.startsWith('CM')) {
+    return { 
+      title: 'Copa Airlines', 
+      subtitle: 'Copa Airlines Hub of Americas',
+      logoUrl: 'https://images.kiwi.com/airlines/64/CM.png',
+      code: 'CM'
+    };
+  }
+  if (norm.includes('AVIANCA') || fNorm.startsWith('AV')) {
+    return { 
+      title: 'Avianca', 
+      subtitle: 'Avianca Holdings',
+      logoUrl: 'https://images.kiwi.com/airlines/64/AV.png',
+      code: 'AV'
+    };
+  }
+  if (norm.includes('VARIG') || fNorm.startsWith('RG') || fNorm.startsWith('VRN') || fNorm.startsWith('VRG')) {
+    return { 
+      title: 'Varig / Gol Grupo', 
+      subtitle: 'Malha Operacional',
+      logoUrl: 'https://images.kiwi.com/airlines/64/RG.png',
+      code: 'RG'
+    };
+  }
+  return { 
+    title: airline || 'Linha Aérea Comercial', 
+    subtitle: 'Operação Regular',
+    code: (airline || 'AIR').substring(0, 3).toUpperCase()
+  };
+}
+
+// Converte e formata o código de voo para o padrão exato da Malha Operacional (IATA + Dígitos)
+// Exemplos: LA1234, G31306, AD4155, TP9012, RG5678, AA905, DL105, UA845, AF454, LH506, KL791
+export function formatMalhaFlightNumber(flightStr?: string, callsignStr?: string, airlineStr?: string): string {
+  const raw = (flightStr || callsignStr || '').trim().toUpperCase().replace(/\s+/g, '');
+  const callsign = (callsignStr || '').trim().toUpperCase().replace(/\s+/g, '');
+  const airline = (airlineStr || '').trim().toUpperCase();
+
+  const icaoToIata: Record<string, string> = {
+    'GLO': 'G3',
+    'TAM': 'LA',
+    'LAN': 'LA',
+    'LXP': 'LA',
+    'AZU': 'AD',
+    'TAP': 'TP',
+    'VRN': 'RG',
+    'VRG': 'RG',
+    'VAR': 'RG',
+    'AAL': 'AA',
+    'UAL': 'UA',
+    'DAL': 'DL',
+    'AFR': 'AF',
+    'DLH': 'LH',
+    'KLM': 'KL',
+    'IBE': 'IB',
+    'CMP': 'CM',
+    'AVA': 'AV',
+    'QTR': 'QR',
+    'UAE': 'EK',
+    'ARG': 'AR',
+    'BOV': 'OB',
+    'PTB': '2Z',
+    'ONE': 'O6',
+    'AEA': 'UX',
+    'RAM': 'AT',
+    'ITY': 'AZ',
+    'SWR': 'LX',
+    'BAW': 'BA',
+    'ETH': 'ET',
+    'TAO': 'TX'
+  };
+
+  // 1. Se o callsign iniciar com código ICAO conhecido de 3 letras (ex: GLO1306 -> G31306, TAM3012 -> LA3012, TAP085 -> TP085, VRN5678 -> RG5678)
+  for (const [icao, iata] of Object.entries(icaoToIata)) {
+    if (callsign.startsWith(icao)) {
+      const digits = callsign.substring(icao.length);
+      return `${iata}${digits}`;
+    }
+    if (raw.startsWith(icao)) {
+      const digits = raw.substring(icao.length);
+      return `${iata}${digits}`;
+    }
+  }
+
+  // 2. Se já estiver no padrão IATA (2 caracteres alfanuméricos + dígitos, ex: LA1234, G31306, TP9012, RG5678)
+  if (/^[A-Z0-9]{2}\d+$/.test(raw)) {
+    return raw;
+  }
+
+  // 3. Casos onde o nome da companhia ou prefixos indicam a empresa
+  if (airline.includes('LATAM') || airline.includes('TAM')) {
+    const digits = raw.replace(/\D/g, '') || callsign.replace(/\D/g, '') || '1000';
+    return `LA${digits}`;
+  }
+  if (airline.includes('GOL')) {
+    const digits = raw.replace(/\D/g, '') || callsign.replace(/\D/g, '') || '1000';
+    return `G3${digits}`;
+  }
+  if (airline.includes('AZUL')) {
+    const digits = raw.replace(/\D/g, '') || callsign.replace(/\D/g, '') || '1000';
+    return `AD${digits}`;
+  }
+  if (airline.includes('TAP')) {
+    const digits = raw.replace(/\D/g, '') || callsign.replace(/\D/g, '') || '1000';
+    return `TP${digits}`;
+  }
+  if (airline.includes('VARIG')) {
+    const digits = raw.replace(/\D/g, '') || callsign.replace(/\D/g, '') || '1000';
+    return `RG${digits}`;
+  }
+
+  // 4. Se tiver 3 letras e números sem mapeamento específico, usa as duas primeiras letras
+  const match = raw.match(/^([A-Z]{2,3})(\d+)$/);
+  if (match) {
+    const code = match[1];
+    const num = match[2];
+    if (icaoToIata[code]) {
+      return `${icaoToIata[code]}${num}`;
+    }
+    return `${code.substring(0, 2)}${num}`;
+  }
+
+  return raw || 'VOO';
 }
 
 // Nomes legíveis para modelos de aeronaves
@@ -185,6 +399,7 @@ export const FlightRadarFlightCard: React.FC<FlightRadarFlightCardProps> = ({
   const destMeta = getAirportMeta(displayDestination);
   const airlineMeta = getFullAirlineTitle(flight.airline, flight.flight);
   const modelFullName = getAircraftModelFullName(flight.aircraft_type);
+  const malhaFlightNumber = formatMalhaFlightNumber(flight.flight, flight.callsign, flight.airline);
 
   // Cálculo de horários realistas baseados na distância e hora atual
   const now = new Date();
@@ -248,34 +463,53 @@ export const FlightRadarFlightCard: React.FC<FlightRadarFlightCardProps> = ({
       className="bg-slate-900 border border-slate-700/80 rounded-2xl overflow-hidden shadow-2xl flex flex-col shrink-0 font-sans transition-all duration-300 animate-in fade-in zoom-in-95"
     >
       {/* 1. TOP BAR / HEADER (ESTILO FLIGHTRADAR24) */}
-      <div className="bg-[#181d24] px-4 py-3 border-b border-slate-800 flex items-center justify-between">
-        <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-2">
-            {/* CALLSIGN / FLIGHT NUMBER EM OURO/AMARELO */}
-            <span className="text-amber-400 font-black text-lg md:text-xl tracking-tight leading-none">
-              {flight.callsign || flight.flight}
-            </span>
-            
-            {/* BADGE DE CÓDIGO IATA DO VOO */}
-            <span className="bg-slate-700/80 text-slate-200 border border-slate-600/60 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-tight">
-              {flight.flight}
-            </span>
-
-            {/* BADGE DO TIPO ICAO DE AERONAVE */}
-            <span className="bg-[#0284C7]/25 text-[#38BDF8] border border-[#0284C7]/50 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-tight font-mono">
-              {flight.aircraft_type || 'A339'}
-            </span>
+      <div className="bg-[#181d24] px-4 py-3 border-b border-slate-800 flex items-center justify-between gap-3">
+        {/* LADO ESQUERDO: LOGO DA COMPANHIA AÉREA + MATRÍCULA E CALLSIGN */}
+        <div className="flex items-center gap-3 min-w-0">
+          {/* LOGO DA COMPANHIA */}
+          <div className="w-10 h-10 flex items-center justify-center shrink-0 overflow-hidden">
+            {airlineMeta.logoUrl ? (
+              <img 
+                src={airlineMeta.logoUrl} 
+                alt={airlineMeta.title}
+                className="w-full h-full object-contain filter drop-shadow"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                  const fallback = (e.target as HTMLElement).parentElement?.querySelector('.logo-fallback') as HTMLElement;
+                  if (fallback) fallback.style.display = 'flex';
+                }}
+              />
+            ) : null}
+            <div 
+              className="logo-fallback w-full h-full rounded bg-slate-700/60 text-slate-300 font-black text-xs items-center justify-center tracking-tighter"
+              style={{ display: airlineMeta.logoUrl ? 'none' : 'flex' }}
+            >
+              {airlineMeta.code || 'AIR'}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[11px] text-slate-300 font-bold truncate max-w-[210px]">
-              {airlineMeta.title}
+          {/* DADOS DE IDENTIFICAÇÃO (PREFIXO • CALLSIGN) */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {flight.registration && (
+              <>
+                <span className="text-amber-300 font-black text-lg md:text-xl tracking-tight leading-none uppercase">
+                  {flight.registration}
+                </span>
+                <span 
+                  className="inline-block w-[1px] h-3.5 md:h-4 bg-slate-600/80 self-center mx-0.5 shrink-0" 
+                  aria-hidden="true"
+                />
+              </>
+            )}
+            {/* CALLSIGN / FLIGHT NUMBER FORMATADO NO PADRÃO MALHA */}
+            <span className="text-amber-400 font-black text-lg md:text-xl tracking-tight leading-none font-mono">
+              {malhaFlightNumber}
             </span>
           </div>
         </div>
 
-        {/* AÇÕES DE CABEÇALHO */}
-        <div className="flex items-center gap-1.5">
+        {/* LADO DIREITO: AÇÕES DE CABEÇALHO */}
+        <div className="flex items-center gap-1.5 shrink-0">
           {onTogglePin && (
             <button 
               onClick={onTogglePin}
@@ -308,21 +542,21 @@ export const FlightRadarFlightCard: React.FC<FlightRadarFlightCardProps> = ({
             <span className="text-3xl font-black tracking-tighter text-white leading-none">
               {originMeta.iata}
             </span>
-            <span className="text-[11px] font-bold text-slate-300 uppercase tracking-tight mt-1 truncate">
-              {originMeta.city}
+            <span className="text-[14px] font-bold font-[Verdana] text-slate-400 tracking-wider mt-1">
+              {originMeta.icao || 'ORIG'}
             </span>
-            <span className="text-[9px] font-semibold text-slate-500 font-mono">
-              DECOLOU
+            <span className="text-[10px] font-sans text-slate-200 uppercase tracking-tight truncate">
+              {originMeta.city}{originMeta.uf ? `-${originMeta.uf}` : ''}
             </span>
           </div>
 
-          {/* ÍCONE DO AVIÃO NO CENTRO */}
+          {/* ÍCONE DE SETA DE DESTINO NO CENTRO */}
           <div className="flex flex-col items-center justify-center px-3">
             <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-              <Plane size={22} className="rotate-90 animate-pulse" fill="currentColor" />
+              <ArrowRight size={22} className="animate-pulse" />
             </div>
             <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 mt-1.5 font-mono">
-              POUSANDO
+              DESTINO
             </span>
           </div>
 
@@ -331,11 +565,11 @@ export const FlightRadarFlightCard: React.FC<FlightRadarFlightCardProps> = ({
             <span className="text-3xl font-black tracking-tighter text-emerald-400 leading-none">
               {destMeta.iata}
             </span>
-            <span className="text-[11px] font-bold text-emerald-300 uppercase tracking-tight mt-1 truncate">
-              {destMeta.city}
+            <span className="text-[14px] font-bold font-[Verdana] text-emerald-400 tracking-wider mt-1">
+              {destMeta.icao || 'SBGR'}
             </span>
-            <span className="text-[9px] font-semibold text-emerald-500 font-mono">
-              GUARULHOS
+            <span className="text-[10px] font-sans text-emerald-300 uppercase tracking-tight truncate">
+              {destMeta.city}{destMeta.uf ? `-${destMeta.uf}` : ''}
             </span>
           </div>
         </div>
@@ -345,22 +579,19 @@ export const FlightRadarFlightCard: React.FC<FlightRadarFlightCardProps> = ({
           
           {/* COLUNA ESQUERDA: HORA ESTIMADA */}
           <div className="px-4 py-3 flex flex-col gap-1 items-center justify-center">
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">HORA ESTIMADA</span>
-            <span className="text-xl font-black text-white font-mono flex items-center gap-1">
-              <Clock size={15} className="text-emerald-400 shrink-0" />
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">POUSO ESTIMADO</span>
+            <span className="text-[22px] font-black text-white font-mono flex items-center gap-1">
+              <Clock size={16} className="text-emerald-400 shrink-0" />
               {estArrTime}
             </span>
-            <span className="text-[8px] font-medium text-slate-500">POUSO ESTIMADO</span>
           </div>
 
           {/* COLUNA DIREITA: TEMPO RESTANTE */}
           <div className="px-4 py-3 flex flex-col gap-1 items-center justify-center bg-emerald-950/20">
-            <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest">TEMPO RESTANTE</span>
-            <span className="text-xl font-black text-emerald-400 font-mono flex items-center gap-1">
-              <Radio size={15} className="text-emerald-400 animate-pulse shrink-0" />
-              {etaMinutes} <span className="text-[10px] font-bold">MIN</span>
+            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">TEMPO RESTANTE</span>
+            <span className="text-[22px] font-black text-emerald-400 font-mono flex items-center gap-1">
+              {etaMinutes} <span className="text-[18px] font-bold">MIN</span>
             </span>
-            <span className="text-[8px] font-medium text-emerald-500">DIST: {distNM} NM</span>
           </div>
 
         </div>
@@ -370,104 +601,6 @@ export const FlightRadarFlightCard: React.FC<FlightRadarFlightCardProps> = ({
       {/* 3. DADOS DE TELEMETRIA EM VOO (SOMENTE DADOS, SEM FOTO) */}
       <div className="p-3.5 flex flex-col gap-2.5 bg-slate-950/80 max-h-[160px] lg:max-h-[250px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 pr-2">
         
-        {/* Banner de Status Operacional e ETA */}
-        <div className="flex items-center justify-between bg-slate-900 border border-slate-800 px-3 py-2 rounded-xl text-xs">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)] animate-ping" />
-            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 font-mono">
-              {flight.status || 'EM VOO (ADS-B LIVE)'}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1.5 text-slate-400 font-mono text-[10px]">
-            <Clock size={12} className="text-amber-400" />
-            <span className="font-bold text-slate-200">ETA: ~{etaMinutes} min</span>
-            <span className="text-slate-500">({distNM} NM)</span>
-          </div>
-        </div>
-
-        {/* Grade de Métricas Físicas de Telemetria */}
-        <div className="grid grid-cols-3 gap-2 text-center font-mono">
-          
-          {/* ALTITUDE */}
-          <div className="bg-slate-900/90 border border-slate-800/80 p-2 rounded-xl flex flex-col items-center justify-center">
-            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-0.5">
-              <Gauge size={10} className="text-cyan-400" /> ALTITUDE
-            </span>
-            <span className="text-xs font-black text-white leading-tight">
-              {flight.alt >= 10000 ? `FL${Math.round(flight.alt / 100)}` : `${flight.alt.toLocaleString()} ft`}
-            </span>
-            <span className="text-[8px] text-slate-500 font-sans mt-0.5">
-              {flight.alt.toLocaleString()} ft QNH
-            </span>
-          </div>
-
-          {/* VELOCIDADE (GROUND SPEED) */}
-          <div className="bg-slate-900/90 border border-slate-800/80 p-2 rounded-xl flex flex-col items-center justify-center">
-            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-0.5">
-              <Navigation size={10} className="text-amber-400" /> VELOCIDADE
-            </span>
-            <span className="text-xs font-black text-white leading-tight">
-              {flight.speed} KT
-            </span>
-            <span className="text-[8px] text-slate-500 font-sans mt-0.5">
-              {Math.round(flight.speed * 1.852)} km/h
-            </span>
-          </div>
-
-          {/* RAZÃO VERTICAL (V/S) */}
-          <div className="bg-slate-900/90 border border-slate-800/80 p-2 rounded-xl flex flex-col items-center justify-center">
-            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-0.5">
-              {vspeedVal < 0 ? (
-                <TrendingDown size={10} className="text-emerald-400" />
-              ) : vspeedVal > 0 ? (
-                <TrendingUp size={10} className="text-cyan-400" />
-              ) : (
-                <Minus size={10} className="text-slate-400" />
-              )}
-              RAZÃO VERT.
-            </span>
-            <span className={`text-xs font-black leading-tight ${
-              vspeedVal < 0 ? 'text-emerald-400' : vspeedVal > 0 ? 'text-cyan-400' : 'text-slate-300'
-            }`}>
-              {vspeedVal > 0 ? `+${vspeedVal}` : vspeedVal} FPM
-            </span>
-            <span className="text-[8px] text-slate-500 font-sans mt-0.5">
-              {isDescending ? 'Descendo' : isClimbing ? 'Subindo' : 'Nivelado'}
-            </span>
-          </div>
-
-        </div>
-
-        {/* Linha de Dados de Identificação e Equipamento */}
-        <div className="bg-slate-900/90 border border-slate-800/80 p-2.5 rounded-xl flex flex-col gap-1.5 text-[10px] font-mono">
-          
-          <div className="flex items-center justify-between border-b border-slate-800/60 pb-1">
-            <span className="text-slate-500 font-bold uppercase">Aeronave:</span>
-            <span className="text-slate-200 font-bold">{modelFullName}</span>
-          </div>
-
-          <div className="flex items-center justify-between border-b border-slate-800/60 pb-1">
-            <span className="text-slate-500 font-bold uppercase">Matrícula (Reg):</span>
-            <span className="text-amber-300 font-black uppercase">{flight.registration || 'N/A'}</span>
-          </div>
-
-          <div className="flex items-center justify-between border-b border-slate-800/60 pb-1">
-            <span className="text-slate-500 font-bold uppercase flex items-center gap-1">
-              <Compass size={11} className="text-slate-400" /> Proa / Rumo:
-            </span>
-            <span className="text-slate-200 font-bold">{flight.track || 0}° ({getCardinalDirection(flight.track || 0)})</span>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <span className="text-slate-500 font-bold uppercase flex items-center gap-1">
-              <Radio size={11} className="text-slate-400" /> Transponder (Squawk):
-            </span>
-            <span className="text-emerald-400 font-bold">{flight.squawk || '7412'} (ADS-B Mode S)</span>
-          </div>
-
-        </div>
-
         {/* 4. BOTÃO DE AÇÃO OPERACIONAL / INTEGRAÇÃO COM A MALHA */}
         <button
           onClick={handleIntegrateClick}

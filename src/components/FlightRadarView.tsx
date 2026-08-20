@@ -4,7 +4,7 @@ import {
   AlertTriangle, SlidersHorizontal, Link2
 } from 'lucide-react';
 import { getNormalizedAirlineInfo } from './AirlineLogo';
-import { FlightRadarFlightCard } from './FlightRadarFlightCard';
+import { FlightRadarFlightCard, formatMalhaFlightNumber } from './FlightRadarFlightCard';
 
 interface FlightPosition {
   flight_id: string;
@@ -291,7 +291,7 @@ export const FlightRadarView: React.FC = () => {
               </div>
             </div>
             <div class="mt-0.5 bg-slate-950/85 border border-slate-800/80 text-[7.5px] font-mono font-bold ${isSelected ? 'text-emerald-400 border-emerald-500/40 font-black' : 'text-slate-200'} px-1 py-0 rounded whitespace-nowrap shadow">
-              ${f.flight}
+              ${formatMalhaFlightNumber(f.flight, f.callsign, f.airline)}
             </div>
           </div>
         `,
@@ -377,57 +377,6 @@ export const FlightRadarView: React.FC = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-9 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-xs placeholder:text-slate-600 focus:outline-none focus:border-emerald-500 transition-colors"
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="flex flex-col gap-0.5">
-                <label className="text-[8px] font-black uppercase tracking-wider text-slate-500">Companhia Aérea</label>
-                <select 
-                  value={selectedAirline}
-                  onChange={(e) => setSelectedAirline(e.target.value)}
-                  className="w-full p-1.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-lg text-xs focus:outline-none font-bold"
-                >
-                  {airlinesList.map(item => (
-                    <option key={item} value={item}>{item}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-0.5">
-                <label className="text-[8px] font-black uppercase tracking-wider text-slate-500">Fluxo Operacional</label>
-                <div className="w-full p-1.5 bg-emerald-950/20 border border-emerald-500/20 text-emerald-400 rounded-lg text-xs font-black uppercase tracking-widest text-center">
-                  Somente Pousos
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between bg-slate-950 border border-slate-800 p-2 rounded-xl text-[10px]">
-              <div className="flex items-center gap-2">
-                <input 
-                  type="checkbox" 
-                  id="auto_refresh" 
-                  checked={autoRefresh}
-                  onChange={(e) => setAutoRefresh(e.target.checked)}
-                  className="rounded bg-slate-950 border-slate-800 accent-emerald-500"
-                />
-                <label htmlFor="auto_refresh" className="font-bold cursor-pointer text-slate-500 uppercase tracking-widest text-[8px]">AUTO ATUALIZAR</label>
-              </div>
-
-              {autoRefresh && (
-                <div className="flex items-center gap-1">
-                  <span className="text-slate-400 text-[9px]">Taxa:</span>
-                  <select 
-                    value={refreshInterval}
-                    onChange={(e) => setRefreshInterval(Number(e.target.value))}
-                    className="p-1 leading-none bg-slate-900 border border-slate-800 text-slate-300 rounded text-[9px] font-bold"
-                  >
-                    <option value="5">5s</option>
-                    <option value="10">10s</option>
-                    <option value="30">30s</option>
-                    <option value="60">60s</option>
-                  </select>
-                </div>
-              )}
             </div>
           </div>
         </div>
